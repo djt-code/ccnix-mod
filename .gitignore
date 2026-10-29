@@ -1,0 +1,14 @@
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+run/
+repo/
+out/
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+bin/
+helper/craftix-tun

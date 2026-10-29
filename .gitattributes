@@ -1,0 +1,6 @@
+# LF everywhere (the helper and its setup script run on Linux), CRLF for
+# the Windows wrapper, and binaries left alone.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.jar binary
+*.png binary

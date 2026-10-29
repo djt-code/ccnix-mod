@@ -1,0 +1,33 @@
+modLoader="javafml"
+loaderVersion="${loader_version_range}"
+license="${mod_license}"
+
+[[mods]]
+modId="${mod_id}"
+version="${mod_version}"
+displayName="${mod_name}"
+authors="Dan Theisen"
+description='''
+A block that joins ComputerCraft's wired network to a real one: computers running cc-turtles' network stack reach real IPv4 hosts, and real hosts reach them, through a TUN device on the server.
+'''
+
+[[dependencies.${mod_id}]]
+    modId="neoforge"
+    type="required"
+    versionRange="[21.1,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="minecraft"
+    type="required"
+    versionRange="${minecraft_version_range}"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="computercraft"
+    type="required"
+    versionRange="[1.120,)"
+    ordering="AFTER"
+    side="BOTH"
