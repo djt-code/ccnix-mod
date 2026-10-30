@@ -73,10 +73,6 @@ public final class Gateway {
         this.clock = clock;
     }
 
-    public Settings settings() {
-        return settings;
-    }
-
     /** New settings; what was learned under another address, MAC or channel is forgotten. */
     public void configure(Settings s) {
         var old = settings;
@@ -95,10 +91,6 @@ public final class Gateway {
     public void removePort(Port p) {
         ports.remove(p);
         heardOn.values().removeIf(q -> q == p);
-    }
-
-    public int portCount() {
-        return ports.size();
     }
 
     // ---------------------------------------------------------------------------------------------------------------

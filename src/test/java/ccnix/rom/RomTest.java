@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
@@ -21,10 +22,10 @@ class RomTest {
     }
 
     @Test
-    void theJarsRomIsCcTurtlesHead() throws Exception {
+    void theJarsRomIsCcnixHead() throws Exception {
         var rom = Rom.fromJar(getClass().getClassLoader());
-        var cct = Path.of(System.getProperty("ccnix.net")).getParent().getParent();
-        assertEquals(git(cct, "rev-parse", "HEAD").trim(), rom.commit);
+        var repo = Path.of(System.getProperty("ccnix.net")).getParent().getParent();
+        assertEquals(git(repo, "rev-parse", "HEAD").trim(), rom.commit);
         assertTrue(rom.date > 1_700_000_000L, "a commit time: " + rom.date);
         assertEquals("https://github.com/djt-code/ccnix", rom.url);
         assertEquals("main", rom.branch);
@@ -34,7 +35,9 @@ class RomTest {
 
         // every blob as git names it: what GitHub's tree gives, so ccnix update skips just these
         var tree = new HashMap<String, String>();
-        for (var line : git(cct, "ls-tree", "-r", "HEAD", "--", "bin", "lib", "turtle", "pc", "help", "deploy").split("\n")) {
+        var lsTree = new ArrayList<>(List.of("ls-tree", "-r", "HEAD", "--"));
+        lsTree.addAll(Rom.DIRS);
+        for (var line : git(repo, lsTree.toArray(String[]::new)).split("\n")) {
             if (line.isBlank()) continue;
             var tab = line.indexOf('\t');
             tree.put(line.substring(tab + 1), line.substring(0, tab).split(" ")[2]);
@@ -45,6 +48,20 @@ class RomTest {
         assertTrue(manifest.contains("\"commit\":\"" + rom.commit + "\""), manifest.substring(0, 200));
         assertTrue(manifest.contains("\"deploy/boot.lua\":\"" + tree.get("deploy/boot.lua") + "\""));
         assertFalse(manifest.contains("[.lua"));
+    }
+
+    @Test
+    void theIndexKeepsToRomDirs() throws Exception {
+        // build.gradle's romPaths fills the jar's ROM and Rom.DIRS reads a checkout's: the same folders, or a file
+        // would come from one ROM and not the other
+        String index;
+        try (var in = getClass().getClassLoader().getResourceAsStream("ccnix-rom/.index")) {
+            index = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        var paths = index.lines().filter(l -> !l.isBlank()).toList();
+        assertFalse(paths.isEmpty());
+        for (var path : paths) assertTrue(Rom.DIRS.stream().anyMatch(d -> path.startsWith(d + "/")), path);
+        for (var d : Rom.DIRS) assertTrue(paths.stream().anyMatch(p -> p.startsWith(d + "/")), d + "/ is in the jar");
     }
 
     @Test
@@ -78,7 +95,7 @@ class RomTest {
     @Test
     void servable() {
         assertTrue(Rom.servable("bin/ls.lua"));
-        assertTrue(Rom.servable("help/cc-turtles.txt"));
+        assertTrue(Rom.servable("help/a-b_c.txt"));
         assertFalse(Rom.servable("bin/[.lua"));
         assertFalse(Rom.servable("LICENSE"));
     }
@@ -90,7 +107,7 @@ class RomTest {
     }
 
     private static String git(Path dir, String... args) throws Exception {
-        var cmd = new java.util.ArrayList<>(List.of("git", "-C", dir.toString()));
+        var cmd = new ArrayList<>(List.of("git", "-C", dir.toString()));
         cmd.addAll(List.of(args));
         var p = new ProcessBuilder(cmd).start();
         var out = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
