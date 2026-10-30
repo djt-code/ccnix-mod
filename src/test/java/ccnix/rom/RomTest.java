@@ -26,7 +26,7 @@ class RomTest {
         var cct = Path.of(System.getProperty("ccnix.net")).getParent().getParent();
         assertEquals(git(cct, "rev-parse", "HEAD").trim(), rom.commit);
         assertTrue(rom.date > 1_700_000_000L, "a commit time: " + rom.date);
-        assertEquals("https://github.com/djt-code/cc-turtles", rom.url);
+        assertEquals("https://github.com/djt-code/ccnix", rom.url);
         assertEquals("main", rom.branch);
         assertTrue(rom.files.containsKey("deploy/boot.lua") && rom.files.containsKey("bin/ccnix.lua")
             && rom.files.containsKey("lib/net.lua") && rom.files.containsKey("help/ccnix.txt"));
@@ -69,8 +69,8 @@ class RomTest {
 
     @Test
     void urls() {
-        assertEquals("https://github.com/djt-code/cc-turtles", Rom.httpsUrl("git@github.com:djt-code/cc-turtles.git"));
-        assertEquals("https://git.example.net/me/cc-turtles", Rom.httpsUrl("https://git.example.net/me/cc-turtles.git"));
+        assertEquals("https://github.com/djt-code/ccnix", Rom.httpsUrl("git@github.com:djt-code/ccnix.git"));
+        assertEquals("https://git.example.net/me/ccnix", Rom.httpsUrl("https://git.example.net/me/ccnix.git"));
         assertNull(Rom.httpsUrl("git@myhost:me/ccnix.git"), "an ssh alias: no way to know its web address");
         assertNull(Rom.httpsUrl(null));
     }

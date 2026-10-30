@@ -10,7 +10,7 @@ import java.util.Set;
 import java.util.function.LongSupplier;
 
 /**
- * The gateway between a CC network (cc-turtles' frames on one modem channel) and the server's TUN device.
+ * The gateway between a CC network (lib/net's frames on one modem channel) and the server's TUN device.
  * <p>
  * It is the link layer for the server, which is the router: CC hosts and routers send packets for the outside to
  * the gateway's address (it answers ARP for it), and each goes into the TUN device as IPv4; the server delivers or

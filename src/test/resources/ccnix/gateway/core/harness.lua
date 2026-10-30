@@ -1,4 +1,4 @@
--- The tests' side of cc-turtles' lib/net: stacks on a clock the test moves.
+-- The tests' side of ccnix's lib/net: stacks on a clock the test moves.
 -- What they transmit waits in H.out for the Java side (CcWorld), which
 -- carries it to the other stacks, and the gateway, on the same wire.
 local N = ...

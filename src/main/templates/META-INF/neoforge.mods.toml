@@ -8,7 +8,7 @@ version="${mod_version}"
 displayName="${mod_name}"
 authors="Dan Theisen"
 description='''
-A block that joins ComputerCraft's wired network to a real one: computers running cc-turtles' network stack reach real IPv4 hosts, and real hosts reach them, through a TUN device on the server.
+ccnix, a small Unix-like distribution for CC: Tweaked, in every computer's ROM, updated with git; and a block that joins ComputerCraft's wired network to a real one: computers running ccnix's network stack reach real IPv4 hosts, and real hosts reach them, through a TUN device on the server.
 '''
 
 [[dependencies.${mod_id}]]

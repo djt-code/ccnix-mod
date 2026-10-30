@@ -37,7 +37,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * ccnix: cc-turtles' programs in every computer's ROM (ccnix.rom), and the Network Gateway, a block joining CC's
+ * ccnix: the ccnix repo's programs in every computer's ROM (ccnix.rom), and the Network Gateway, a block joining CC's
  * wired network to a real one through a TUN device on the server (ccnix.gateway).
  */
 @Mod(Ccnix.ID)
@@ -86,7 +86,7 @@ public final class Ccnix {
         if (rom == null) {
             out.add("ROM: not loaded");
         } else {
-            out.add("ROM: cc-turtles " + rom.commit.substring(0, Math.min(7, rom.commit.length()))
+            out.add("ROM: ccnix " + rom.commit.substring(0, Math.min(7, rom.commit.length()))
                 + (rom.date > 0 ? " (" + Instant.ofEpochSecond(rom.date) + ")" : "") + ", " + rom.files.size()
                 + " files, from " + rom.source);
             out.add("  computers update from " + rom.url + " " + rom.branch

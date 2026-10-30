@@ -53,18 +53,20 @@ dependencies {
     compileOnly "cc.tweaked:cc-tweaked-${minecraft_version}-forge-api:${cct_version}"
     runtimeOnly "cc.tweaked:cc-tweaked-${minecraft_version}-forge:${cct_version}"
 
-    // The tests run cc-turtles' lib/net.lua in Cobalt, CC's Lua VM.
+    // The tests run ccnix's lib/net.lua in Cobalt, CC's Lua VM.
     testImplementation "cc.tweaked:cobalt:${cobalt_version}"
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
 }
 
-// cc-turtles: the repo this is the mod/ submodule of, or one beside this
-def ccTurtles = file('../lib/net.lua').exists() ? file('..') : file('../cc-turtles')
+// ccnix's Lua, for the ROM and the tests: the ccnix/ submodule (git submodule
+// update --init ccnix), or, with that not checked out, the ccnix repo this is
+// the mod/ submodule of, or one beside this
+def luaRepo = [file('ccnix'), file('..'), file('../ccnix')].find { new File(it, 'lib/net.lua').exists() } ?: file('ccnix')
 
 test {
     useJUnitPlatform()
-    systemProperty 'ccnix.net', new File(ccTurtles, 'lib/net.lua').absolutePath
+    systemProperty 'ccnix.net', new File(luaRepo, 'lib/net.lua').absolutePath
     testLogging {
         events 'failed'
         exceptionFormat 'full'
@@ -91,8 +93,9 @@ var generateModMetadata = tasks.register('generateModMetadata', ProcessResources
 sourceSets.main.resources.srcDir generateModMetadata
 neoForge.ideSyncTask generateModMetadata
 
-// The ROM: cc-turtles' programs as committed at its HEAD (git archive, so
-// local edits and line endings don't come along), into ccnix-rom/ with an
+// The ROM: ccnix's programs as committed at that repo's HEAD, the submodule's
+// commit (git archive, so local edits and line endings don't come along),
+// into ccnix-rom/ with an
 // index of the files, and ccnix-rom.properties: the commit, its time, and
 // the repo and branch computers pull their updates from.
 def romPaths = ['bin', 'lib', 'turtle', 'pc', 'help', 'deploy']
@@ -101,11 +104,14 @@ var generateRom = tasks.register('generateRom') {
     outputs.dir romOut
     outputs.upToDateWhen { false }                      // (git knows what's changed, not Gradle)
     doLast {
+        if (!new File(luaRepo, 'lib/net.lua').exists()) {
+            throw new GradleException("ccnix's Lua isn't here for the ROM: git submodule update --init ccnix")
+        }
         def git = { List<String> args ->
-            def proc = new ProcessBuilder(['git', '-c', 'core.autocrlf=false', '-C', ccTurtles.absolutePath] + args).start()
+            def proc = new ProcessBuilder(['git', '-c', 'core.autocrlf=false', '-C', luaRepo.absolutePath] + args).start()
             def out = proc.inputStream.readAllBytes()
             def err = new String(proc.errorStream.readAllBytes())
-            if (proc.waitFor() != 0) throw new GradleException("git ${args.join(' ')} in ${ccTurtles}: ${err}")
+            if (proc.waitFor() != 0) throw new GradleException("git ${args.join(' ')} in ${luaRepo}: ${err}")
             return out
         }
         def out = romOut.get().asFile

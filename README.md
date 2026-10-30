@@ -2,7 +2,7 @@
 
 A Minecraft mod (NeoForge 1.21.1, with CC: Tweaked) with two parts:
 
-- **The ROM.** [cc-turtles](https://github.com/djt-code/cc-turtles)' programs go into every computer's ROM: the
+- **The ROM.** [ccnix](https://github.com/djt-code/ccnix)'s programs go into every computer's ROM: the
   shell `ccsh`, the POSIX utilities, `git`, the network stack, `init` and the services, telnet, and the turtle
   programs. They're on the path at every boot, with nothing to install. Each computer can pull updates over its ROM
   with `ccnix update`, and the server's admin updates the ROM itself with `git pull`.
@@ -17,11 +17,11 @@ CC: Tweaked builds every computer's ROM from the server's data packs. The mod ad
 
 At each boot that autorun runs `deploy/boot.lua`. It puts the programs on the path and their help on the help path,
 and makes `ls` ccnix's. It brings the network up while `net.boot` is on. With `init.boot`, `ccsh.login` or
-`cc-turtles.autostart` set, it runs those at the end of startup. cc-turtles' README has the details, under "ccnix".
+`cc-turtles.autostart` set, it runs those at the end of startup. The ccnix repo's README has the details.
 
 ### On a computer: updates without the admin
 
-`ccnix update` pulls the latest from the repo into the computer's `/ccnix`, with cc-turtles' `git`. It keeps only
+`ccnix update` pulls the latest from the repo into the computer's `/ccnix`, with ccnix's `git`. It keeps only
 the files that differ from the ROM's: a file the ROM already has, with the same git blob, isn't fetched. From the
 next boot, each program, library and help page comes from `/ccnix` if it's there, and from the ROM if not.
 
@@ -36,15 +36,15 @@ every file's blob SHA-1.
 ### On the server: updates with git
 
 The ROM comes from one of two places:
-- **The jar.** It's cc-turtles as committed when the mod was built.
-- **A checkout.** If the server's folder has `ccnix-rom/`, a git checkout of cc-turtles, the ROM comes from there
+- **The jar.** It's the ccnix repo as committed at the `ccnix/` submodule's commit when the mod was built.
+- **A checkout.** If the server's folder has `ccnix-rom/`, a git checkout of the ccnix repo, the ROM comes from there
   instead.
 
 To set up a checkout:
 
 ```sh
 cd /path/to/server
-git clone https://github.com/djt-code/cc-turtles ccnix-rom
+git clone https://github.com/djt-code/ccnix ccnix-rom
 ```
 
 To update it:
@@ -89,7 +89,7 @@ The **gateway** is the server's link onto the CC network, and the **server** is 
 
   The gateway asks ARP for the MAC first. Packets wait meanwhile (3 tries, a second apart), and are dropped if no
   answer comes.
-- Packets are converted field for field, so real stacks and cc-turtles' TCP talk as equals:
+- Packets are converted field for field, so real stacks and ccnix's TCP talk as equals:
   - **Real to CC:** TCP options coming in are skipped, and none go out, so real peers keep to 536-byte segments and
     don't scale windows.
   - **What crosses:** TCP, UDP with a string payload, ICMP echo, unreachable and time exceeded.
@@ -146,7 +146,7 @@ The server has to be Linux, for the TUN device.
    | Key | Default | What |
    |---|---|---|
    | `gateway.address` | `10.0.0.1/24` | The gateway's address and its network. Use the device's address. |
-   | `gateway.channel` | `4040` | The modem channel: 4040 is cc-turtles' untagged network, 4040 + n is VLAN n. |
+   | `gateway.channel` | `4040` | The modem channel: 4040 is ccnix's untagged network, 4040 + n is VLAN n. |
    | `gateway.mac` | `gateway` | Its MAC on the CC network. |
    | `gateway.routes` | `[]` | Networks behind CC routers: `["10.1.0.0/16 via 10.0.0.2"]`. The longest match wins. |
    | `tun.helper` | `ccnix-tun` | The helper, with any arguments before the device's name. |
@@ -185,11 +185,17 @@ of two ways:
 
 `./gradlew build` builds and tests it. It needs Java 21, which Gradle fetches if it's missing, and git.
 
-The build needs cc-turtles: at `..` when this repo is cc-turtles' `mod/` submodule, or at `../cc-turtles` beside it.
-- **The ROM** is cc-turtles' `HEAD`, taken with `git archive`, so uncommitted edits and line endings stay out.
-  `rom_url` and `rom_branch` in `gradle.properties` say where computers pull updates from.
-- **The tests** run cc-turtles' own `lib/net.lua` in Cobalt, CC's Lua VM. They cover:
-  - **The ROM:** the jar's ROM is cc-turtles' `HEAD`, each file's blob SHA matches `git ls-tree`'s, and a checkout
+The build needs ccnix's Lua: the repo at the `ccnix/` submodule. Clone with
+`git clone --recurse-submodules https://github.com/djt-code/ccnix-mod`, or run `git submodule update --init ccnix` in a
+clone. With the submodule not checked out, the build uses the ccnix repo this is the `mod/` submodule of, or one at
+`../ccnix`.
+- **The ROM** is that repo at the submodule's commit, taken with `git archive`, so uncommitted edits and line endings
+  stay out. For a newer ROM, `git submodule update --remote ccnix`, then commit the new pointer. `rom_url` and
+  `rom_branch` in `gradle.properties` say where computers pull updates from.
+- **Each repo is a submodule of the other.** ccnix's `mod/` (this repo) is set `update = none`, so recursive submodule
+  commands stop there instead of going round for ever. In ccnix, `git submodule update --init --checkout mod` gets it.
+- **The tests** run ccnix's own `lib/net.lua` in Cobalt, CC's Lua VM. They cover:
+  - **The ROM:** the jar's ROM is the submodule's `HEAD`, each file's blob SHA matches `git ls-tree`'s, and a checkout
     is read right, with or without `git`.
   - **Conversion:** both ways, checked against packets built separately, with Linux's SYN options and IP options.
   - **The gateway:** ARP, routes, ports, retries and expiry.

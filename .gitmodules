@@ -1,0 +1,3 @@
+[submodule "ccnix"]
+	path = ccnix
+	url = ../ccnix.git

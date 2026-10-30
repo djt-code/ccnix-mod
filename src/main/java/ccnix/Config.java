@@ -24,7 +24,7 @@ public final class Config {
         .define("address", Settings.DEFAULT_ADDRESS);
 
     public static final ModConfigSpec.IntValue CHANNEL = BUILDER
-        .comment("The modem channel: 4040 is cc-turtles' network untagged, 4040 + n is VLAN n.")
+        .comment("The modem channel: 4040 is ccnix's network untagged, 4040 + n is VLAN n.")
         .defineInRange("channel", Settings.DEFAULT_CHANNEL, 0, 65535);
 
     public static final ModConfigSpec.ConfigValue<String> MAC = BUILDER

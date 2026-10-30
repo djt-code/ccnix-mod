@@ -5,7 +5,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Packets between cc-turtles' network stack (lib/net.lua) and real IPv4, field for field.
+ * Packets between ccnix's network stack (lib/net.lua) and real IPv4, field for field.
  * <p>
  * A CC packet is the Lua table { src, dst, ttl, id, proto, data } as CC hands it to Java: a Map with String keys,
  * numbers as Double, strings as String with one char per byte (Cobalt decodes Latin-1 style), booleans as Boolean.

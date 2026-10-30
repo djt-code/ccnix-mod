@@ -10,7 +10,7 @@ import static ccnix.gateway.core.Packets.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * cc-turtles' own stack (lib/net.lua, run in Cobalt) through the gateway:
+ * ccnix's own stack (lib/net.lua, run in Cobalt) through the gateway:
  * <pre>
  *   A 10.0.0.5 --lan-- R 10.0.0.2 | 10.1.0.1 --far-- B 10.1.0.6
  *                  |

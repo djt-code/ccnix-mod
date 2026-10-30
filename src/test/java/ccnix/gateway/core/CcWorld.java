@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * CC computers running cc-turtles' lib/net in Cobalt (CC's Lua VM), cables between them, a gateway on one cable,
+ * CC computers running ccnix's lib/net in Cobalt (CC's Lua VM), cables between them, a gateway on one cable,
  * and a kernel behind its TUN device: as in game, but on a clock the test moves.
  * <p>
  * Frames cross between computers as CC carries modem messages: converted to Java (CobaltLuaMachine.toObject's
@@ -61,7 +61,7 @@ final class CcWorld {
         CoreLibraries.standardGlobals(state);
         var netPath = System.getProperty("ccnix.net");
         if (netPath == null || !Files.exists(Path.of(netPath))) {
-            throw new IllegalStateException("no lib/net.lua (ccnix.net = " + netPath + "): cc-turtles beside this repo?");
+            throw new IllegalStateException("no lib/net.lua (ccnix.net = " + netPath + "): is the ccnix/ submodule checked out?");
         }
         var net = LuaThread.runMain(state, load(Files.newInputStream(Path.of(netPath)), "@lib/net.lua")).first();
         state.globals().rawset("N", net);

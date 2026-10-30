@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 /**
- * cc-turtles' programs as every computer's ROM has them, at /rom/ccnix: the copy built into the jar, or the
+ * The ccnix repo's programs as every computer's ROM has them, at /rom/ccnix: the copy built into the jar, or the
  * server's own git checkout ({@value #CHECKOUT} in the server's folder) when there is one, so the server's admin
  * updates it with git pull and /reload.
  * <p>
@@ -89,7 +89,7 @@ public final class Rom {
     }
 
     /**
-     * A git checkout of cc-turtles: the files in its DIRS as they are on disk, and the commit and its time from
+     * A git checkout of the ccnix repo: the files in its DIRS as they are on disk, and the commit and its time from
      * git (or .git/HEAD alone, with no git on the server). The repo URL is the checkout's origin when it's one
      * computers can fetch from over HTTPS, else the jar's.
      */
