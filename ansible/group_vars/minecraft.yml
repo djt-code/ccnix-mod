@@ -7,6 +7,10 @@ minecraft_home: /srv/minecraft
 minecraft_dir: /srv/minecraft/server
 minecraft_heap_min: 2G
 minecraft_heap_max: 5G                     # the VM has 7 GB
+# more JVM options.  preferIPv4Stack: the LAN advertises an IPv6 route that
+# goes nowhere, and Java tried it first for Mojang's session server, so
+# every login failed with "Authentication servers are down".
+minecraft_jvm_options: ["-Djava.net.preferIPv4Stack=true"]
 minecraft_ports: ["25565/tcp", "24454/udp"]   # the game; Simple Voice Chat
 
 # server.properties keys to keep as given (the server writes the rest)

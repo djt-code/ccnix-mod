@@ -153,7 +153,7 @@
 
     - name: user_jvm_args.txt
       ansible.builtin.copy:
-        content: "-Xms{{ minecraft_heap_min }} -Xmx{{ minecraft_heap_max }}\n"
+        content: "-Xms{{ minecraft_heap_min }} -Xmx{{ minecraft_heap_max }} {{ minecraft_jvm_options | join(' ') }}\n"
         dest: "{{ minecraft_dir }}/user_jvm_args.txt"
         owner: "{{ minecraft_user }}"
         mode: "0644"
