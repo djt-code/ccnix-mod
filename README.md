@@ -102,7 +102,8 @@ The **gateway** is the server's link onto the CC network, and the **server** is 
 
 ### Setting up a server
 
-The server has to be Linux, for the TUN device.
+The server has to be Linux, for the TUN device. [doc/ubuntu-server.md](doc/ubuntu-server.md) walks through a fresh
+Ubuntu VM, the server, and the gateway with a CC router and a VLAN behind it, end to end.
 
 1. **Build the helper** and put it on the server's path:
 
