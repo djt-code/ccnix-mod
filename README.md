@@ -1,13 +1,73 @@
 # ccnix
 
-A Minecraft mod (NeoForge 1.21.1, with CC: Tweaked) that joins ComputerCraft's wired network to a real one. The
-**Network Gateway** block sits on CC cables. CC computers running
-[cc-turtles](https://github.com/djt-code/cc-turtles)' network stack (`lib/net.lua`) route at it, and their packets
-come out of a TUN device on the server as real IPv4. Packets the server sends into that device go to the CC computer
-they're for.
+A Minecraft mod (NeoForge 1.21.1, with CC: Tweaked) with two parts:
 
-So a real machine can `telnet` to a CC computer running `telnetd`, `ping` it, or `nc` to it. A CC computer can reach
-anything the server can reach.
+- **The ROM.** [cc-turtles](https://github.com/djt-code/cc-turtles)' programs go into every computer's ROM: the
+  shell `ccsh`, the POSIX utilities, `git`, the network stack, `init` and the services, telnet, and the turtle
+  programs. They're on the path at every boot, with nothing to install. Each computer can pull updates over its ROM
+  with `ccnix update`, and the server's admin updates the ROM itself with `git pull`.
+- **The Network Gateway.** A block on CC cables that joins ComputerCraft's wired network to a real one through a TUN
+  device on the server. A real machine can `telnet` to a CC computer running `telnetd`, `ping` it, or `nc` to it, and
+  a CC computer can reach anything the server can reach.
+
+## The ROM
+
+CC: Tweaked builds every computer's ROM from the server's data packs. The mod adds one, which holds the repo's
+`bin/`, `lib/`, `turtle/`, `pc/`, `help/` and `deploy/` at `/rom/ccnix`, and `/rom/autorun/ccnix.lua`.
+
+At each boot that autorun runs `deploy/boot.lua`. It puts the programs on the path and their help on the help path,
+and makes `ls` ccnix's. It brings the network up while `net.boot` is on. With `init.boot`, `ccsh.login` or
+`cc-turtles.autostart` set, it runs those at the end of startup. cc-turtles' README has the details, under "ccnix".
+
+### On a computer: updates without the admin
+
+`ccnix update` pulls the latest from the repo into the computer's `/ccnix`, with cc-turtles' `git`. It keeps only
+the files that differ from the ROM's: a file the ROM already has, with the same git blob, isn't fetched. From the
+next boot, each program, library and help page comes from `/ccnix` if it's there, and from the ROM if not.
+
+- `ccnix` says what the ROM is and which updates are in use.
+- `ccnix reset` drops the updates.
+- **When the ROM changes,** updates made against the old ROM are left out until the next `ccnix update`.
+- **When the ROM is newer than the branch,** an update keeps nothing.
+
+The ROM's `.manifest` is what makes this work. It holds the commit, its time, the repo and branch to pull from, and
+every file's blob SHA-1.
+
+### On the server: updates with git
+
+The ROM comes from one of two places:
+- **The jar.** It's cc-turtles as committed when the mod was built.
+- **A checkout.** If the server's folder has `ccnix-rom/`, a git checkout of cc-turtles, the ROM comes from there
+  instead.
+
+To set up a checkout:
+
+```sh
+cd /path/to/server
+git clone https://github.com/djt-code/cc-turtles ccnix-rom
+```
+
+To update it:
+
+```sh
+git -C ccnix-rom pull
+```
+
+Then run `/reload` in game, or from the server console. Computers see the new files at once; boot changes apply at
+their next boot.
+
+- **What's served:** the files in the checkout's folders, as they are on disk, so a local edit is served too. The
+  commit and its time come from `git` on the server.
+- **The repo computers pull from:** the checkout's `origin`, if it's an https URL (or `git@github.com:`), and
+  otherwise the jar's.
+- **Switching back:** delete `ccnix-rom/` and `/reload` to go back to the jar's ROM.
+- **Status:** `/ccnix` (operators) shows which ROM is in use, its commit and where computers pull from. The server
+  log says so at each load.
+
+A data pack can't hold a file whose name has capitals or `[`, so the ROM leaves out `bin/[.lua`. `ccnix update`
+fetches it into `/ccnix`, as it does any file the ROM lacks.
+
+## The Network Gateway
 
 ```
  CC host 10.0.0.5 ─┐
@@ -16,7 +76,7 @@ anything the server can reach.
    └ 10.1.0.0/16 behind it   channel 4040         no privileges)
 ```
 
-## How it works
+### How it works
 
 The **gateway** is the server's link onto the CC network, and the **server** is the router:
 
@@ -40,7 +100,7 @@ The **gateway** is the server's link onto the CC network, and the **server** is 
   Minecraft server needs no privileges. The helper needs none either, once the device belongs to the server's user.
   The helper starts with the first gateway block loaded, so a world without one runs no helper.
 
-## Setting up a server
+### Setting up a server
 
 The server has to be Linux, for the TUN device.
 
@@ -64,7 +124,7 @@ The server has to be Linux, for the TUN device.
 
    ```ini
    [Unit]
-   Description=TUN device for the ccnix
+   Description=TUN device for ccnix's Network Gateway
    Before=minecraft.service
 
    [Service]
@@ -77,11 +137,11 @@ The server has to be Linux, for the TUN device.
    WantedBy=multi-user.target
    ```
 
-3. **Install the mod.** Build it with `./gradlew build`, then put `build/libs/ccnix-<version>.jar` in the
-   server's `mods/`. Clients need it too, for the block. It needs CC: Tweaked 1.120 or later.
+3. **Install the mod.** Build it with `./gradlew build`, then put `build/libs/ccnix-<version>.jar` in the server's
+   `mods/`. Clients need it too, for the block. It needs CC: Tweaked 1.120 or later.
 
-4. **Configure it** in `world/serverconfig/ccnix-server.toml`. Put a copy in `defaultconfigs/` to give new
-   worlds the same settings. Edits take effect while the server runs.
+4. **Configure it** in `world/serverconfig/ccnix-server.toml`. Put a copy in `defaultconfigs/` to give new worlds
+   the same settings. Edits take effect while the server runs.
 
    | Key | Default | What |
    |---|---|---|
@@ -93,7 +153,7 @@ The server has to be Linux, for the TUN device.
    | `tun.device` | `ccnix0` | The TUN device. |
 
 5. **Place a Network Gateway** and cable it to CC routers' wired modems. It's crafted from a full wired modem, iron,
-   stone and redstone, and found in the Functional Blocks tab. `/gateway` (operators) shows:
+   stone and redstone, and found in the Functional Blocks tab. `/ccnix` (operators) shows the gateway too:
    - its address, routes and blocks;
    - the neighbours it knows;
    - packets carried and dropped;
@@ -101,7 +161,7 @@ The server has to be Linux, for the TUN device.
 
    The server log has the helper's messages.
 
-## On the CC side
+### On the CC side
 
 A router with a wired modem on the gateway's cable (`back`), and its own network on another modem:
 
@@ -123,21 +183,25 @@ of two ways:
 
 ## Building and testing
 
-`./gradlew build` builds and tests it. It needs Java 21, which Gradle fetches if it's missing.
+`./gradlew build` builds and tests it. It needs Java 21, which Gradle fetches if it's missing, and git.
 
-The tests run cc-turtles' own `lib/net.lua` in Cobalt, CC's Lua VM. It's found at `../lib/net.lua` when this repo is
-cc-turtles' `mod/` submodule, or at `../cc-turtles/lib/net.lua` beside it. They cover:
-
-- **Conversion:** both ways, checked against packets built separately, with Linux's SYN options and IP options.
-- **The gateway:** ARP, routes, ports, retries and expiry.
-- **End to end:** CC computers ping, TCP and UDP to each other through the gateway and a fake kernel. A scripted
-  "real" client then connects to a CC listener the way Linux would: its SYN options, sequence numbers wrapping past
-  2^32, binary data, both halves of the close, a refused port, ping, and an ICMP port unreachable.
+The build needs cc-turtles: at `..` when this repo is cc-turtles' `mod/` submodule, or at `../cc-turtles` beside it.
+- **The ROM** is cc-turtles' `HEAD`, taken with `git archive`, so uncommitted edits and line endings stay out.
+  `rom_url` and `rom_branch` in `gradle.properties` say where computers pull updates from.
+- **The tests** run cc-turtles' own `lib/net.lua` in Cobalt, CC's Lua VM. They cover:
+  - **The ROM:** the jar's ROM is cc-turtles' `HEAD`, each file's blob SHA matches `git ls-tree`'s, and a checkout
+    is read right, with or without `git`.
+  - **Conversion:** both ways, checked against packets built separately, with Linux's SYN options and IP options.
+  - **The gateway:** ARP, routes, ports, retries and expiry.
+  - **End to end:** CC computers ping, TCP and UDP to each other through the gateway and a fake kernel. A scripted
+    "real" client then connects to a CC listener the way Linux would: its SYN options, sequence numbers wrapping
+    past 2^32, binary data, both halves of the close, a refused port, ping, and an ICMP port unreachable.
 
 `./gradlew runServer` runs a dev server with CC: Tweaked in `run/`.
 
 ## Not yet
 
+- **Files deleted upstream** stay in the ROM, under a computer's updates, until the server's copy catches up.
 - **No DHCP:** routers' addresses are set by hand.
 - **No ICMP errors from the gateway itself.** A packet it can't deliver is just dropped. The gateway shares the
   server's address, and the server would refuse an ICMP from its own address.

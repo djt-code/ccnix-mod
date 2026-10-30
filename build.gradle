@@ -59,12 +59,12 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
 }
 
+// cc-turtles: the repo this is the mod/ submodule of, or one beside this
+def ccTurtles = file('../lib/net.lua').exists() ? file('..') : file('../cc-turtles')
+
 test {
     useJUnitPlatform()
-    // lib/net.lua: cc-turtles beside this repo, or this repo as its mod/ submodule
-    def beside = file('../cc-turtles/lib/net.lua')
-    def above = file('../lib/net.lua')
-    systemProperty 'ccnix.net', (above.exists() ? above : beside).absolutePath
+    systemProperty 'ccnix.net', new File(ccTurtles, 'lib/net.lua').absolutePath
     testLogging {
         events 'failed'
         exceptionFormat 'full'
@@ -90,6 +90,47 @@ var generateModMetadata = tasks.register('generateModMetadata', ProcessResources
 }
 sourceSets.main.resources.srcDir generateModMetadata
 neoForge.ideSyncTask generateModMetadata
+
+// The ROM: cc-turtles' programs as committed at its HEAD (git archive, so
+// local edits and line endings don't come along), into ccnix-rom/ with an
+// index of the files, and ccnix-rom.properties: the commit, its time, and
+// the repo and branch computers pull their updates from.
+def romPaths = ['bin', 'lib', 'turtle', 'pc', 'help', 'deploy']
+def romOut = layout.buildDirectory.dir('generated/rom')
+var generateRom = tasks.register('generateRom') {
+    outputs.dir romOut
+    outputs.upToDateWhen { false }                      // (git knows what's changed, not Gradle)
+    doLast {
+        def git = { List<String> args ->
+            def proc = new ProcessBuilder(['git', '-c', 'core.autocrlf=false', '-C', ccTurtles.absolutePath] + args).start()
+            def out = proc.inputStream.readAllBytes()
+            def err = new String(proc.errorStream.readAllBytes())
+            if (proc.waitFor() != 0) throw new GradleException("git ${args.join(' ')} in ${ccTurtles}: ${err}")
+            return out
+        }
+        def out = romOut.get().asFile
+        project.delete(out)
+        def rom = new File(out, 'ccnix-rom')
+        rom.mkdirs()
+        def tar = new File(temporaryDir, 'rom.tar')
+        tar.bytes = git(['archive', '--format=tar', 'HEAD', '--'] + romPaths)
+        project.copy {
+            from project.tarTree(tar)
+            into rom
+        }
+        def names = new String(git(['ls-tree', '-r', '--name-only', '-z', 'HEAD', '--'] + romPaths), 'UTF-8').split('\u0000')
+        new File(rom, '.index').setText(names.findAll { it }.join('\n') + '\n', 'UTF-8')
+        def commit = new String(git(['rev-parse', 'HEAD'])).trim()
+        def time = new String(git(['log', '-1', '--format=%ct', 'HEAD'])).trim()
+        new File(out, 'ccnix-rom.properties').setText(
+            "commit=${commit}\ndate=${time}\nurl=${rom_url}\nbranch=${rom_branch}\n", 'UTF-8')
+    }
+}
+sourceSets.main.resources.srcDir generateRom
+
+tasks.named('jar') {
+    from('LICENSE') { into 'META-INF' }
+}
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
