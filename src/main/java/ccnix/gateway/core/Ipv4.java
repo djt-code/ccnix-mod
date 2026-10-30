@@ -5,21 +5,16 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Packets between ccnix's network stack (lib/net.lua) and real IPv4, field for field.
+ * Packets between ccnix's network stack and real IPv4, field for field as lib/net.lua's "Bridging to a real network"
+ * lays out.
  * <p>
- * A CC packet is the Lua table { src, dst, ttl, id, proto, data } as CC hands it to Java: a Map with String keys,
- * numbers as Double, strings as String with one char per byte (Cobalt decodes Latin-1 style), booleans as Boolean.
- * Going the other way, a Map becomes a table, any Number a number and a byte[] a string, byte for byte.
- * <ul>
- * <li>IP: no options, fragments or TOS. A fragment from the real side is dropped (TUN hands over whole packets
- * unless something upstream fragments).</li>
- * <li>TCP { sport, dport, seq, ack, syn, fin, rst, wnd, data }: ack is there exactly when the ACK flag is. Options
- * coming in are skipped, and none go out, so a real peer keeps to the default MSS (536) and no window scaling.</li>
- * <li>UDP { sport, dport, data }: only a string crosses.</li>
- * <li>ICMP: echo (8) and reply (0) as { type, id, seq, data }; unreachable (3) and time exceeded (11) as
- * { type, code, orig }, orig holding the original packet's addresses, proto, ports and seq (TCP) or id and seq
- * (ICMP) rather than its bytes. Errors going out are rebuilt from orig as a header and 8 bytes.</li>
- * </ul>
+ * CC hands a packet table to Java as a Map with String keys, numbers as Double, strings as String with one char per
+ * byte (Cobalt decodes Latin-1 style), booleans as Boolean. Going the other way, a Map becomes a table, any Number a
+ * number and a byte[] a string, byte for byte.
+ * <p>
+ * What can't cross is dropped: fragments (TUN hands over whole packets unless something upstream fragments), IPv6,
+ * UDP payloads that aren't strings, and ICMP code 4 (fragmentation needed: CC's packets are small). TCP options
+ * coming in are skipped, and none go out, so a real peer keeps to the default MSS (536) and no window scaling.
  */
 public final class Ipv4 {
     public static final long ALL = 0xFFFFFFFFL;
