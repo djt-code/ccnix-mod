@@ -8,7 +8,7 @@ nothing unless the bundle or a variable did.
 
 | File | What |
 |---|---|
-| `inventory.ini` | the hosts (`devserver`, 192.0.2.10, as `admin` with passwordless sudo) |
+| `inventory.example.ini` | the hosts: copy to `inventory.ini` (ignored by git) with yours; the user needs passwordless sudo |
 | `group_vars/minecraft.yml` | versions, heap, ports, `server.properties` keys, the gateway's address, routes, TUN networks, forwarding and NAT |
 | `site.yml` | the play |
 | `templates/` | `minecraft.service`, `ccnix-tun.service`, the first `ccnix-server.toml` |

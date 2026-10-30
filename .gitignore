@@ -13,3 +13,4 @@ out/
 bin/
 helper/ccnix-tun
 server-bundle.tar.gz
+ansible/inventory.ini
