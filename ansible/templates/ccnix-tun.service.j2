@@ -1,0 +1,19 @@
+# {{ ansible_managed }}
+[Unit]
+Description=TUN device for ccnix's Network Gateway
+Before=minecraft.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+Environment=DEVICE={{ ccnix_tun_device }}
+{% if ccnix_forward %}
+Environment=FORWARD=1
+{% endif %}
+{% if ccnix_nat %}
+Environment=NAT={{ ccnix_nat }}
+{% endif %}
+ExecStart=/usr/local/sbin/ccnix-tun-setup {{ minecraft_user }} {{ ccnix_gateway_address }} {{ ccnix_tun_networks | join(' ') }}
+
+[Install]
+WantedBy=multi-user.target

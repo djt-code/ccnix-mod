@@ -12,3 +12,4 @@ out/
 .settings/
 bin/
 helper/ccnix-tun
+server-bundle.tar.gz

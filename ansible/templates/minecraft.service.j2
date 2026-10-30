@@ -1,0 +1,22 @@
+# {{ ansible_managed }}
+# The server runs in a tmux session, so its console stays at hand:
+# `mc-console` attaches (Ctrl+B D leaves), `mc-cmd <command>` types one.
+[Unit]
+Description=Minecraft: the dma.space pack with ccnix
+After=network-online.target ccnix-tun.service
+Wants=network-online.target ccnix-tun.service
+
+[Service]
+Type=forking
+User={{ minecraft_user }}
+WorkingDirectory={{ minecraft_dir }}
+# (the account's shell is nologin; tmux runs the command with this one)
+Environment=SHELL=/bin/sh
+ExecStart=/usr/bin/tmux new-session -d -s mc ./run.sh nogui
+ExecStop=/bin/sh -c 'tmux send-keys -t mc stop Enter; while tmux has-session -t mc 2>/dev/null; do sleep 1; done'
+TimeoutStopSec=180
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

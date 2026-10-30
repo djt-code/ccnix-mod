@@ -1,0 +1,9 @@
+[gateway]
+	address = "{{ ccnix_gateway_address }}"
+	channel = {{ ccnix_gateway_channel }}
+	mac = "{{ ccnix_gateway_mac }}"
+	routes = [{{ ccnix_gateway_routes | map('to_json') | join(', ') }}]
+
+[tun]
+	helper = "ccnix-tun"
+	device = "{{ ccnix_tun_device }}"

@@ -1,0 +1,228 @@
+# The dma.space dev server with ccnix, on Ubuntu 26.04.
+#
+#   helper/server-bundle.sh "<CurseForge instance>"    (the server's mods and configs)
+#   cd ansible && ansible-playbook site.yml [-e ccnix_bundle=...]
+#
+# From Windows without WSL: ansible/run-on-host.sh copies this and the
+# bundle to the host and runs it there.  Running it again changes nothing
+# unless the bundle or the variables changed; a new bundle replaces mods/
+# (and the pack's config/) with the server stopped.
+- name: Minecraft dev server (dma.space + ccnix)
+  hosts: minecraft
+  become: true
+  vars:
+    neoforge_args: "{{ minecraft_dir }}/libraries/net/neoforged/neoforge/{{ neoforge_version }}/unix_args.txt"
+
+  tasks:
+    - name: Packages
+      ansible.builtin.apt:
+        name: ["{{ java_package }}", gcc, libc6-dev, iptables, tmux, acl, curl]
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: The service account
+      ansible.builtin.user:
+        name: "{{ minecraft_user }}"
+        system: true
+        home: "{{ minecraft_home }}"
+        shell: /usr/sbin/nologin
+        create_home: true
+
+    # The gateway's helper and the TUN device it holds
+    - name: Helper source
+      ansible.builtin.copy:
+        src: ../helper/ccnix-tun.c
+        dest: /usr/local/src/ccnix-tun.c
+        mode: "0644"
+      register: helper_src
+
+    - name: Build ccnix-tun
+      ansible.builtin.command: cc -O2 -Wall -o /usr/local/bin/ccnix-tun /usr/local/src/ccnix-tun.c
+      when: helper_src.changed
+      notify: Restart minecraft
+
+    - name: ccnix-tun-setup
+      ansible.builtin.copy:
+        src: ../helper/ccnix-tun-setup
+        dest: /usr/local/sbin/ccnix-tun-setup
+        mode: "0755"
+      notify: Restart ccnix-tun
+
+    - name: ccnix-tun.service
+      ansible.builtin.template:
+        src: ccnix-tun.service.j2
+        dest: /etc/systemd/system/ccnix-tun.service
+        mode: "0644"
+      notify: Restart ccnix-tun
+
+    - name: The TUN device, now and at every boot
+      ansible.builtin.systemd_service:
+        name: ccnix-tun
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    # NeoForge
+    - name: Server folder
+      ansible.builtin.file:
+        path: "{{ minecraft_dir }}"
+        state: directory
+        owner: "{{ minecraft_user }}"
+        group: "{{ minecraft_user }}"
+        mode: "0755"
+
+    - name: NeoForge installer
+      ansible.builtin.get_url:
+        url: "https://maven.neoforged.net/releases/net/neoforged/neoforge/{{ neoforge_version }}/neoforge-{{ neoforge_version }}-installer.jar"
+        dest: "{{ minecraft_home }}/neoforge-{{ neoforge_version }}-installer.jar"
+        owner: "{{ minecraft_user }}"
+        mode: "0644"
+
+    - name: Install NeoForge {{ neoforge_version }}
+      ansible.builtin.command:
+        cmd: java -jar {{ minecraft_home }}/neoforge-{{ neoforge_version }}-installer.jar --install-server .
+        chdir: "{{ minecraft_dir }}"
+        creates: "{{ neoforge_args }}"
+      become_user: "{{ minecraft_user }}"
+      notify: Restart minecraft
+
+    # The pack's mods and configs, with ccnix
+    - name: The bundle
+      ansible.builtin.copy:
+        src: "{{ ccnix_bundle }}"
+        dest: "{{ minecraft_home }}/server-bundle.tar.gz"
+        owner: "{{ minecraft_user }}"
+        mode: "0644"
+      register: bundle
+
+    - name: Stop the server for the new mods
+      ansible.builtin.systemd_service:
+        name: minecraft
+        state: stopped
+      when: bundle.changed
+      failed_when: false             # (not there yet on the first run)
+
+    - name: Clear the old mods
+      ansible.builtin.file:
+        path: "{{ minecraft_dir }}/mods"
+        state: absent
+      when: bundle.changed
+
+    - name: Unpack the bundle
+      ansible.builtin.unarchive:
+        src: "{{ minecraft_home }}/server-bundle.tar.gz"
+        dest: "{{ minecraft_dir }}"
+        remote_src: true
+        owner: "{{ minecraft_user }}"
+        group: "{{ minecraft_user }}"
+      when: bundle.changed
+      notify: Restart minecraft
+
+    # The mod rewrites this file with its own comments, so it's written
+    # whole only when missing, and after that just the keys are kept as
+    # set (the mod reloads them while the server runs).
+    - name: The gateway's config, if there's none
+      ansible.builtin.template:
+        src: ccnix-server.toml.j2
+        dest: "{{ minecraft_dir }}/config/ccnix-server.toml"
+        owner: "{{ minecraft_user }}"
+        mode: "0644"
+        force: false
+
+    - name: The gateway's settings
+      ansible.builtin.lineinfile:
+        path: "{{ minecraft_dir }}/config/ccnix-server.toml"
+        regexp: "^\\s*{{ item.key }} = "
+        line: "\t{{ item.key }} = {{ item.value }}"
+      loop: "{{ ccnix_settings | dict2items }}"
+      vars:
+        ccnix_settings:
+          address: '"{{ ccnix_gateway_address }}"'
+          channel: "{{ ccnix_gateway_channel }}"
+          mac: '"{{ ccnix_gateway_mac }}"'
+          routes: "[{{ ccnix_gateway_routes | map('to_json') | join(', ') }}]"
+          helper: '"ccnix-tun"'
+          device: '"{{ ccnix_tun_device }}"'
+
+    - name: eula.txt
+      ansible.builtin.copy:
+        content: "eula=true\n"
+        dest: "{{ minecraft_dir }}/eula.txt"
+        owner: "{{ minecraft_user }}"
+        mode: "0644"
+
+    - name: user_jvm_args.txt
+      ansible.builtin.copy:
+        content: "-Xms{{ minecraft_heap_min }} -Xmx{{ minecraft_heap_max }}\n"
+        dest: "{{ minecraft_dir }}/user_jvm_args.txt"
+        owner: "{{ minecraft_user }}"
+        mode: "0644"
+      notify: Restart minecraft
+
+    - name: server.properties
+      ansible.builtin.lineinfile:
+        path: "{{ minecraft_dir }}/server.properties"
+        regexp: "^{{ item.key }}="
+        line: "{{ item.key }}={{ item.value }}"
+        create: true
+        owner: "{{ minecraft_user }}"
+        mode: "0644"
+      loop: "{{ server_properties | dict2items }}"
+      notify: Restart minecraft
+
+    # The service and its console
+    - name: minecraft.service
+      ansible.builtin.template:
+        src: minecraft.service.j2
+        dest: /etc/systemd/system/minecraft.service
+        mode: "0644"
+      notify: Restart minecraft
+
+    - name: mc-console and mc-cmd
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/{{ item.name }}"
+        mode: "0755"
+        content: |
+          #!/bin/sh
+          # {{ item.what }}
+          {{ item.run }}
+      loop:
+        - name: mc-console
+          what: "the server's console (Ctrl+B D leaves it running)"
+          run: exec sudo -u {{ minecraft_user }} tmux attach -t mc
+        - name: mc-cmd
+          what: 'type a command at the server''s console: mc-cmd "op somebody"'
+          run: exec sudo -u {{ minecraft_user }} tmux send-keys -t mc "$*" Enter
+
+    - name: Is ufw on?
+      ansible.builtin.command: ufw status
+      register: ufw_status
+      changed_when: false
+      failed_when: false
+
+    - name: Firewall, if ufw is on
+      ansible.builtin.command: ufw allow {{ item }}
+      loop: "{{ minecraft_ports }}"
+      when: "'Status: active' in ufw_status.stdout"
+      register: ufw
+      changed_when: "'Skipping' not in ufw.stdout"
+
+    - name: The server, now and at every boot
+      ansible.builtin.systemd_service:
+        name: minecraft
+        enabled: true
+        state: started
+        daemon_reload: true
+
+  handlers:
+    - name: Restart ccnix-tun
+      ansible.builtin.systemd_service:
+        name: ccnix-tun
+        state: restarted
+        daemon_reload: true
+
+    - name: Restart minecraft
+      ansible.builtin.systemd_service:
+        name: minecraft
+        state: restarted
+        daemon_reload: true

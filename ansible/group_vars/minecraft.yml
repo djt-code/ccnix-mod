@@ -1,0 +1,29 @@
+# The server: the dma.space pack (DMA 1.5) with the ccnix mod.
+neoforge_version: "21.1.256"
+java_package: openjdk-21-jre-headless      # NeoForge 1.21.1 wants Java 21 exactly
+
+minecraft_user: minecraft                  # runs the server, and the gateway's helper under it
+minecraft_home: /srv/minecraft
+minecraft_dir: /srv/minecraft/server
+minecraft_heap_min: 2G
+minecraft_heap_max: 5G                     # the VM has 7 GB
+minecraft_ports: ["25565/tcp", "24454/udp"]   # the game; Simple Voice Chat
+
+# server.properties keys to keep as given (the server writes the rest)
+server_properties:
+  motd: "dma.space dev (ccnix)"
+  online-mode: "true"
+
+# The bundle from helper/server-bundle.sh, on the controller: mods/,
+# config/, defaultconfigs/.  Pass -e ccnix_bundle=... or set it here.
+ccnix_bundle: "{{ playbook_dir }}/../server-bundle.tar.gz"
+
+# The Network Gateway (config/ccnix-server.toml) and the TUN device under it
+ccnix_gateway_address: 10.0.0.1/24
+ccnix_gateway_channel: 4040
+ccnix_gateway_mac: gateway
+ccnix_gateway_routes: ["10.1.0.0/16 via 10.0.0.2"]   # CC networks behind CC routers
+ccnix_tun_device: ccnix0
+ccnix_tun_networks: ["10.1.0.0/16"]                  # routed into the device on the server
+ccnix_forward: true             # the server routes between CC's networks and its LAN
+ccnix_nat: ""                   # an uplink name (eth0) to masquerade CC's networks out of it

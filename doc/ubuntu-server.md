@@ -12,6 +12,11 @@ booted to "Done" with ccnix in it before this was written.
 Where it says **desktop**, that's Git Bash on Windows; **VM** is a root
 shell unless it says `minecraft`.
 
+**Sections 3, 4 and 6 are automated** by [../ansible/](../ansible/README.md):
+after section 2's bundle, `ansible/run-on-host.sh` (or `ansible-playbook
+site.yml`) does them, with the server as the `minecraft` service
+(`mc-console`, `mc-cmd`). What follows is what it does, by hand.
+
 ## 1. The client: CC: Tweaked 1.120.2, and ccnix
 
 The pack lists CC: Tweaked **1.113.1**, but its own Advanced Peripherals
