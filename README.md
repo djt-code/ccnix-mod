@@ -17,7 +17,7 @@ CC: Tweaked builds every computer's ROM from the server's data packs. The mod ad
 
 At each boot that autorun runs `deploy/boot.lua`. It puts the programs on the path and their help on the help path,
 and makes `ls` ccnix's. It brings the network up while `net.boot` is on. With `init.boot`, `ccsh.login` or
-`cc-turtles.autostart` set, it runs those at the end of startup. The ccnix repo's README has the details.
+`ccnix.autostart` set, it runs those at the end of startup. The ccnix repo's README has the details.
 
 ### On a computer: updates without the admin
 
@@ -191,12 +191,14 @@ clone. With the submodule not checked out, the build uses the ccnix repo this is
 `../ccnix`.
 - **The ROM** is that repo at the submodule's commit, taken with `git archive`, so uncommitted edits and line endings
   stay out. For a newer ROM, `git submodule update --remote ccnix`, then commit the new pointer. `rom_url` and
-  `rom_branch` in `gradle.properties` say where computers pull updates from.
+  `rom_branch` in `gradle.properties` say where computers pull updates from; they go into the jar as
+  `ccnix-rom.properties`, with the commit and its time, and the ROM's `.manifest` is built from that file and the
+  files' blobs.
 - **Each repo is a submodule of the other.** ccnix's `mod/` (this repo) is set `update = none`, so recursive submodule
   commands stop there instead of going round for ever. In ccnix, `git submodule update --init --checkout mod` gets it.
 - **The tests** run ccnix's own `lib/net.lua` in Cobalt, CC's Lua VM. They cover:
-  - **The ROM:** the jar's ROM is the submodule's `HEAD`, each file's blob SHA matches `git ls-tree`'s, and a checkout
-    is read right, with or without `git`.
+  - **The ROM:** the jar's ROM is the submodule's `HEAD`, each file's blob SHA matches `git ls-tree`'s, its files keep
+    to the ROM's folders, and a checkout is read right, with or without `git`.
   - **Conversion:** both ways, checked against packets built separately, with Linux's SYN options and IP options.
   - **The gateway:** ARP, routes, ports, retries and expiry.
   - **End to end:** CC computers ping, TCP and UDP to each other through the gateway and a fake kernel. A scripted
