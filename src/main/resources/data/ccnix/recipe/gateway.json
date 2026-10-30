@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    "SIS",
+    "IMI",
+    "SRS"
+  ],
+  "key": {
+    "S": { "item": "minecraft:stone" },
+    "I": { "item": "minecraft:iron_ingot" },
+    "M": { "item": "computercraft:wired_modem_full" },
+    "R": { "item": "minecraft:redstone" }
+  },
+  "result": { "id": "ccnix:gateway", "count": 1 }
+}

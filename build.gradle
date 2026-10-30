@@ -64,7 +64,7 @@ test {
     // lib/net.lua: cc-turtles beside this repo, or this repo as its mod/ submodule
     def beside = file('../cc-turtles/lib/net.lua')
     def above = file('../lib/net.lua')
-    systemProperty 'craftix.net', (above.exists() ? above : beside).absolutePath
+    systemProperty 'ccnix.net', (above.exists() ? above : beside).absolutePath
     testLogging {
         events 'failed'
         exceptionFormat 'full'

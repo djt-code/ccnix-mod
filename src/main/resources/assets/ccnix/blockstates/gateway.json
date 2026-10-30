@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "ccnix:block/gateway" }
+  }
+}
