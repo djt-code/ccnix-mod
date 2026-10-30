@@ -109,10 +109,10 @@ it, end to end.
    ```
 
 2. **Make the device** as root, for the user the server runs as. Give it the gateway's address, and the networks CC
-   routers will have behind them (one big one is simplest):
+   routers will have behind them:
 
    ```sh
-   sudo helper/ccnix-tun-setup minecraft 10.0.0.1/24 10.0.0.0/8
+   sudo helper/ccnix-tun-setup minecraft 10.0.0.1/24 10.1.0.0/16
    ```
 
    - The networks go in a routing table of their own (4040, or `TABLE=`), which the host's own routes come before

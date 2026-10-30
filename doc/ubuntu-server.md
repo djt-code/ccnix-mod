@@ -87,13 +87,13 @@ install -m 755 /root/ccnix-tun-setup /usr/local/sbin/
 ```
 
 **The device.** The gateway is `10.0.0.1/24`; CC networks behind CC
-routers live in `10.0.0.0/8`. `NAT=<uplink>` lets CC computers reach past
+routers live in `10.1.0.0/16`. `NAT=<uplink>` lets CC computers reach past
 the VM; leave it off for a first run.
 
 ```sh
-NAT=eth0 ccnix-tun-setup minecraft 10.0.0.1/24 10.0.0.0/8
+NAT=eth0 ccnix-tun-setup minecraft 10.0.0.1/24 10.1.0.0/16
 ip -br addr show ccnix0                  # UNKNOWN 10.0.0.1/24
-ip route show table 4040                 # 10.0.0.0/8 dev ccnix0
+ip route show table 4040                 # 10.1.0.0/16 dev ccnix0
 ip rule | grep 404                       # main without its default route first, then table 4040
 ```
 
@@ -113,7 +113,7 @@ Before=minecraft.service
 Type=oneshot
 RemainAfterExit=yes
 Environment=NAT=eth0
-ExecStart=/usr/local/sbin/ccnix-tun-setup minecraft 10.0.0.1/24 10.0.0.0/8
+ExecStart=/usr/local/sbin/ccnix-tun-setup minecraft 10.0.0.1/24 10.1.0.0/16
 
 [Install]
 WantedBy=multi-user.target

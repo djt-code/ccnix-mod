@@ -31,7 +31,7 @@ ccnix_tun_device: ccnix0
 # Routed into the device on the server, in a routing table of their own
 # (ccnix_tun_table) that the host's own routes come before.  Every gateway
 # route, ops' too, has to be inside one of these.
-ccnix_tun_networks: ["10.0.0.0/8"]
+ccnix_tun_networks: ["10.1.0.0/16"]
 ccnix_tun_table: 4040
 ccnix_forward: true             # the server routes between CC's networks and its LAN
 ccnix_nat: ""                   # an uplink name (eth0) to masquerade CC's networks out of it
