@@ -12,19 +12,21 @@ booted to "Done" with ccnix in it before this was written.
 Where it says **desktop**, that's Git Bash on Windows; **VM** is a root
 shell unless it says `minecraft`.
 
-## 1. The client: one CC: Tweaked, and ccnix
+## 1. The client: CC: Tweaked 1.120.2, and ccnix
 
-The pack ships CC: Tweaked **1.113.1**, but its own Advanced Peripherals
-needs 1.119 or later and cc_sable 1.117.1 or later (ccnix: 1.120). So the
-instance must run **1.120.2** and only that:
+The pack lists CC: Tweaked **1.113.1**, but its own Advanced Peripherals
+needs 1.119 or later and cc_sable 1.117.1 or later (ccnix: 1.120). What
+saves it is `cc-tweaked-1.21.1-forge-1.120.2.jar` beside it in `mods/`:
+with two jars of one mod, NeoForge loads the highest version and ignores
+the other (the log lists both under "Found mod file"; the in-game Mods
+list shows 1.120.2). So:
 
-1. CurseForge → the dma.space instance → Mods. Turn **CC: Tweaked
-   (1.113.1) off**, or use its "Change version" for 1.120.2 if offered.
-2. Keep `cc-tweaked-1.21.1-forge-1.120.2.jar` in the instance's `mods/`
-   (it's from another CurseForge entry, so it doesn't show as an update;
-   download it from Modrinth or `https://maven.squiddev.cc/cc/tweaked/cc-tweaked-1.21.1-forge/1.120.2/`
-   if it's gone).
-3. Build ccnix and put it in the instance:
+1. Keep `cc-tweaked-1.21.1-forge-1.120.2.jar` in the instance's `mods/`.
+   It's from another CurseForge entry, so CurseForge shows only the
+   pack's 1.113.1; if it's ever gone, get it from Modrinth or
+   `https://maven.squiddev.cc/cc/tweaked/cc-tweaked-1.21.1-forge/1.120.2/`.
+   Turning 1.113.1 off in CurseForge is tidier but not needed.
+2. Build ccnix and put it in the instance:
 
    ```sh
    # desktop
@@ -32,9 +34,9 @@ instance must run **1.120.2** and only that:
    cp build/libs/ccnix-0.1.0.jar "<your CurseForge instance folder>/mods/"
    ```
 
-**Every pack update** in CurseForge puts 1.113.1 back on: turn it off
-again before launching (two `computercraft` jars and the game won't
-start).
+After a pack update, check the Mods screen (title screen → Mods → CC:
+Tweaked) still says 1.120.2: an update that removed the extra jar would
+leave 1.113.1, and Advanced Peripherals would refuse to load.
 
 Launch the instance once to check it loads, then leave it for section 5.
 
@@ -42,7 +44,7 @@ Launch the instance once to check it loads, then leave it for section 5.
 
 The pack has no server pack, so the server's mods come from the client
 instance: all of them less **Sodium** (a client renderer: it stops a
-dedicated server before any mod loads) and CC: Tweaked 1.113.1, plus
+dedicated server before any mod loads) and the unused CC: Tweaked 1.113.1, plus
 ccnix. `helper/server-bundle.sh` makes that set, with the instance's
 `config/` and `defaultconfigs/`:
 
@@ -173,7 +175,7 @@ folder and `/reload` to go back to the jar's.
 CurseForge → dma.space → Play → Multiplayer → Add Server: `<vm>:25565`.
 The client and server must have the same mod set, give or take client-only
 mods: if the join fails with a mod mismatch, the screen names the mod;
-usually a CC: Tweaked 1.113.1 that a pack update turned back on (section
+usually CC: Tweaked if a pack update took the 1.120.2 jar away (section
 1), or a ccnix jar older than the server's.
 
 **Without the pack**, to work on the mod alone, `./gradlew runServer` and

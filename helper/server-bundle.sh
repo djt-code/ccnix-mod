@@ -11,8 +11,8 @@
 # The bundle holds mods/, config/ and defaultconfigs/ for the server's
 # folder: the instance's mods less the ones a dedicated server can't load
 # (CLIENT_ONLY below), less any CC: Tweaked older than 1.120 (a pack update
-# can put one back beside the newer jar; ccnix and the pack's own
-# Advanced Peripherals need 1.120 or 1.119), and build/libs' ccnix jar.
+# lists one beside the newer jar, which NeoForge would ignore anyway; ccnix
+# and the pack's Advanced Peripherals need 1.120 and 1.119), and build/libs' ccnix jar.
 # Runs in Git Bash on Windows or on Linux; build the mod first.
 set -e
 
