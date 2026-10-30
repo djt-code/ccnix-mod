@@ -84,7 +84,7 @@ final class CcnixCommand {
         if (rom == null) {
             out.add("ROM: not loaded");
         } else {
-            out.add("ROM: ccnix " + rom.commit.substring(0, Math.min(7, rom.commit.length()))
+            out.add("ROM: ccnix " + rom.version + " at " + shortCommit(rom.commit)
                 + (rom.date > 0 ? " (" + Instant.ofEpochSecond(rom.date) + ")" : "") + ", " + rom.files.size()
                 + " files, from " + rom.source);
             out.add("  computers update from " + rom.url + " " + rom.branch + "; /ccnix rom update pulls "
@@ -169,19 +169,29 @@ final class CcnixCommand {
         boolean clone = !Files.isDirectory(dir.resolve(".git"));
         if (clone && Files.exists(dir)) return fail(src, dir + " is there but isn't a git checkout: move it out of the way");
         if (clone && (rom == null || rom.url == null)) return fail(src, "No repo to clone: the mod's ROM didn't load");
-        var was = rom == null ? "none" : shortCommit(rom.commit);
+        var was = rom == null ? "none" : rom.version + " at " + shortCommit(rom.commit);
         src.sendSuccess(() -> Component.literal(clone ? "Cloning " + rom.url + " " + rom.branch + " into " + Rom.CHECKOUT + "/..."
             : "Pulling " + Rom.CHECKOUT + "/..."), true);
         CompletableFuture.supplyAsync(() -> {
             var got = clone ? git(dir.getParent(), "clone", "--depth", "1", "--branch", rom.branch, rom.url, Rom.CHECKOUT)
                 : git(dir, "pull", "--ff-only");
-            return got.ok() ? git(dir, "rev-parse", "HEAD") : got;
+            if (!got.ok()) return got;
+            var commit = git(dir, "rev-parse", "HEAD");
+            if (!commit.ok()) return commit;
+            String version;
+            try {
+                var v = Files.readString(dir.resolve("deploy/version")).trim();
+                version = v.isEmpty() ? "unversioned" : v.split("\\s+")[0];
+            } catch (IOException e) {
+                version = "unversioned";
+            }
+            return new Git(true, version + " at " + shortCommit(commit.out()));
         }).thenAccept(got -> server.execute(() -> {
             if (!got.ok()) {
                 src.sendFailure(Component.literal("ROM update failed: " + got.out()));
                 return;
             }
-            var is = shortCommit(got.out());
+            var is = got.out();
             server.reloadResources(server.getPackRepository().getSelectedIds()).whenComplete((v, e) -> {
                 if (e != null) {
                     src.sendFailure(Component.literal("Reloading failed: " + e.getMessage()));

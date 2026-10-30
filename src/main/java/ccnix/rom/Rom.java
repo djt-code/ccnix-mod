@@ -31,6 +31,8 @@ public final class Rom {
     /** Where it came from, for /ccnix and the log. */
     public final String source;
     public final String commit, url, branch;
+    /** ccnix's version, deploy/version's (semantic), or "unversioned" for a commit from before it had one. */
+    public final String version;
     /** The commit's time, seconds since 1970 (0 if unknown). */
     public final long date;
     /** Repo path to contents, for the files a ROM can hold. */
@@ -52,6 +54,9 @@ public final class Rom {
         });
         this.files = kept;
         this.leftOut = out;
+        var v = all.get("deploy/version");
+        var text = v == null ? "" : new String(v, StandardCharsets.UTF_8).trim();
+        this.version = text.isEmpty() ? "unversioned" : text.split("\\s+")[0];
     }
 
     /** The checkout in the server's folder if there's one, else the jar's. */
@@ -113,9 +118,10 @@ public final class Rom {
             url != null ? url : jar.url, branch != null && !branch.equals("HEAD") ? branch : jar.branch, all);
     }
 
-    /** The .manifest: JSON, as bin/git.lua's --lower reads it. */
+    /** The .manifest: JSON, as bin/git.lua's --lower reads it (and ccnix's version). */
     public byte[] manifest() {
-        var b = new StringBuilder("{\"url\":").append(json(url)).append(",\"branch\":").append(json(branch))
+        var b = new StringBuilder("{\"version\":").append(json(version)).append(",\"url\":").append(json(url))
+            .append(",\"branch\":").append(json(branch))
             .append(",\"commit\":").append(json(commit)).append(",\"date\":").append(date)
             .append(",\"source\":").append(json(source)).append(",\"files\":{");
         var first = true;

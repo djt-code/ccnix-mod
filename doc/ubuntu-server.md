@@ -36,7 +36,7 @@ list shows 1.120.2). So:
    ```sh
    # desktop
    cd ~/Projects/ccnix-mod && git pull && ./gradlew build
-   cp build/libs/ccnix-0.1.0.jar "<your CurseForge instance folder>/mods/"
+   cp build/libs/ccnix-0.2.0.jar "<your CurseForge instance folder>/mods/"
    ```
 
 After a pack update, check the Mods screen (title screen → Mods → CC:
@@ -59,7 +59,7 @@ cd ~/Projects/ccnix-mod
 helper/server-bundle.sh "<your CurseForge instance folder>" server-bundle.tar.gz
 #   left out: cc-tweaked-1.21.1-forge-1.113.1.jar (CC: Tweaked older than 1.120)
 #   left out: sodium-neoforge-0.8.13+mc1.21.1.jar (client-only)
-#   server-bundle.tar.gz: 125 mods, with ccnix-0.1.0.jar
+#   server-bundle.tar.gz: 125 mods, with ccnix-0.2.0.jar
 scp server-bundle.tar.gz helper/ccnix-tun.c helper/ccnix-tun-setup root@<vm>:/root/
 ```
 

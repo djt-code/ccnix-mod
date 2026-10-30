@@ -29,6 +29,8 @@ class RomTest {
         assertTrue(rom.date > 1_700_000_000L, "a commit time: " + rom.date);
         assertEquals("https://github.com/djt-code/ccnix", rom.url);
         assertEquals("main", rom.branch);
+        assertEquals(Files.readString(repo.resolve("deploy/version")).trim(), rom.version);
+        assertTrue(rom.version.matches("\\d+\\.\\d+\\.\\d+"), "semantic: " + rom.version);
         assertTrue(rom.files.containsKey("deploy/boot.lua") && rom.files.containsKey("bin/ccnix.lua")
             && rom.files.containsKey("lib/net.lua") && rom.files.containsKey("help/ccnix.txt"));
         assertEquals(List.of("bin/[.lua"), rom.leftOut, "[ has no resource path");
@@ -46,6 +48,7 @@ class RomTest {
         rom.files.forEach((path, data) -> assertEquals(tree.get(path), Rom.blobSha(data), path));
         var manifest = new String(rom.manifest(), StandardCharsets.UTF_8);
         assertTrue(manifest.contains("\"commit\":\"" + rom.commit + "\""), manifest.substring(0, 200));
+        assertTrue(manifest.startsWith("{\"version\":\"" + rom.version + "\""), manifest.substring(0, 200));
         assertTrue(manifest.contains("\"deploy/boot.lua\":\"" + tree.get("deploy/boot.lua") + "\""));
         assertFalse(manifest.contains("[.lua"));
     }

@@ -79,7 +79,7 @@ public final class RomPack extends AbstractPackResources {
             map.put("lua/rom/ccnix/.manifest", rom.manifest());
             map.put("lua/rom/autorun/ccnix.lua", Rom.AUTORUN.getBytes(StandardCharsets.UTF_8));
             if (current == null || !current.commit.equals(rom.commit) || !current.source.equals(rom.source)) {
-                LOG.info("ccnix ROM: {} from {}, {} files", rom.commit.substring(0, Math.min(7, rom.commit.length())),
+                LOG.info("ccnix ROM: {} {} from {}, {} files", rom.version, rom.commit.substring(0, Math.min(7, rom.commit.length())),
                     rom.source, rom.files.size());
                 if (!rom.leftOut.isEmpty()) LOG.info("ccnix ROM: left out (no name for them in a data pack): {}", rom.leftOut);
             }

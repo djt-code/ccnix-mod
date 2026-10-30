@@ -23,7 +23,7 @@ CLIENT_ONLY="sodium-"
 inst=$1
 out=${2:-server-bundle.tar.gz}
 here=$(cd "$(dirname "$0")/.." && pwd)
-jar=$(ls "$here"/build/libs/ccnix-*.jar 2>/dev/null | grep -v -- '-sources' | head -1)
+jar=$(ls "$here"/build/libs/ccnix-*.jar 2>/dev/null | grep -v -- '-sources' | sort -V | tail -1)   # (the newest version)
 [ -d "$inst/mods" ] || { echo "no mods/ in $inst" >&2; exit 1; }
 [ -n "$jar" ] || { echo "no ccnix jar in build/libs: ./gradlew build first" >&2; exit 1; }
 
