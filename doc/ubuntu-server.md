@@ -1,49 +1,87 @@
-# A test server on Ubuntu, and the gateway end to end
+# A dev server on Ubuntu with the dma.space pack, and the gateway end to end
 
-A fresh Ubuntu (26.04 or thereabouts) VM, a Minecraft server with the ccnix
-mod on it, and a CC network behind a CC router on a VLAN, reached from the
-VM with `ping`, `telnet` and `nc`. Everything here runs as root unless it
-says `minecraft`. Versions: NeoForge 21.1.252, CC: Tweaked 1.120.2, Java 21.
+An Ubuntu (26.04) VM running the dma.space modpack's server with the ccnix
+mod, your desktop's CurseForge instance as the client, and then a CC
+network behind a CC router on a VLAN, reached from the VM with `ping`,
+`telnet` and `nc`.
 
-## 1. The VM
+Versions, from the pack (DMA 1.5, 2026-10-30): Minecraft 1.21.1, NeoForge
+21.1.256, Java 21, CC: Tweaked 1.120.2. The server's mod set below was
+booted to "Done" with ccnix in it before this was written.
+
+Where it says **desktop**, that's Git Bash on Windows; **VM** is a root
+shell unless it says `minecraft`.
+
+## 1. The client: one CC: Tweaked, and ccnix
+
+The pack ships CC: Tweaked **1.113.1**, but its own Advanced Peripherals
+needs 1.119 or later and cc_sable 1.117.1 or later (ccnix: 1.120). So the
+instance must run **1.120.2** and only that:
+
+1. CurseForge → the dma.space instance → Mods. Turn **CC: Tweaked
+   (1.113.1) off**, or use its "Change version" for 1.120.2 if offered.
+2. Keep `cc-tweaked-1.21.1-forge-1.120.2.jar` in the instance's `mods/`
+   (it's from another CurseForge entry, so it doesn't show as an update;
+   download it from Modrinth or `https://maven.squiddev.cc/cc/tweaked/cc-tweaked-1.21.1-forge/1.120.2/`
+   if it's gone).
+3. Build ccnix and put it in the instance:
+
+   ```sh
+   # desktop
+   cd ~/Projects/ccnix-mod && git pull && ./gradlew build
+   cp build/libs/ccnix-0.1.0.jar "<your CurseForge instance folder>/mods/"
+   ```
+
+**Every pack update** in CurseForge puts 1.113.1 back on: turn it off
+again before launching (two `computercraft` jars and the game won't
+start).
+
+Launch the instance once to check it loads, then leave it for section 5.
+
+## 2. The server's files, from the instance
+
+The pack has no server pack, so the server's mods come from the client
+instance: all of them less **Sodium** (a client renderer: it stops a
+dedicated server before any mod loads) and CC: Tweaked 1.113.1, plus
+ccnix. `helper/server-bundle.sh` makes that set, with the instance's
+`config/` and `defaultconfigs/`:
 
 ```sh
-apt update && apt install -y openjdk-21-jdk-headless git gcc tmux curl iptables
+# desktop
+cd ~/Projects/ccnix-mod
+helper/server-bundle.sh "<your CurseForge instance folder>" server-bundle.tar.gz
+#   left out: cc-tweaked-1.21.1-forge-1.113.1.jar (CC: Tweaked older than 1.120)
+#   left out: sodium-neoforge-0.8.13+mc1.21.1.jar (client-only)
+#   server-bundle.tar.gz: 125 mods, with ccnix-0.1.0.jar
+scp server-bundle.tar.gz helper/ccnix-tun.c helper/ccnix-tun-setup root@<vm>:/root/
+```
+
+(~250 MB.) If a later pack adds a client-only mod, the server log names
+it ("invalid dist DEDICATED_SERVER", or a client class in the first stack
+trace): add its jar's name prefix to `CLIENT_ONLY` in the script.
+
+## 3. The VM
+
+```sh
+apt update && apt install -y openjdk-21-jre-headless gcc tmux curl iptables
+java -version                                 # 21: NeoForge 1.21.1 wants exactly 21, not 25
 adduser --system --group --home /srv/minecraft --shell /bin/bash minecraft
-ufw allow 25565/tcp        # if ufw is on
-ip -br link               # note the uplink's name (eth0, enp0s3...): NAT below wants it
+ufw allow 25565/tcp; ufw allow 24454/udp      # the game; Simple Voice Chat (if ufw is on)
+ip -br link                                   # the uplink's name (eth0, enp0s3...), for NAT
 ```
 
-Java 21 is what NeoForge 1.21.1 needs; the JDK (not just the JRE) because
-the mod is built here too.
+At least **8 GB of RAM** for the VM: the server gets 6.
 
-## 2. The mod and the helper
+**The gateway's helper** (holds the TUN device):
 
 ```sh
-su - minecraft
-git clone --recurse-submodules https://github.com/djt-code/ccnix-mod
-cd ccnix-mod && ./gradlew build          # ~5 min the first time (NeoForge, CC:T, Gradle itself)
-ls build/libs/ccnix-0.1.0.jar            # the mod, for the server and every client
-exit
+cc -O2 -Wall -o /usr/local/bin/ccnix-tun /root/ccnix-tun.c
+install -m 755 /root/ccnix-tun-setup /usr/local/sbin/
 ```
 
-(`--recurse-submodules` brings the `ccnix/` submodule the ROM is built from;
-its own `mod/` submodule is `update = none`, so it stops there. Or build on
-Windows with `.\gradlew build` and `scp` the jar.)
-
-The helper holds the TUN device for the server:
-
-```sh
-cd /srv/minecraft/ccnix-mod
-cc -O2 -Wall -o /usr/local/bin/ccnix-tun helper/ccnix-tun.c
-install -m 755 helper/ccnix-tun-setup /usr/local/sbin/
-```
-
-## 3. The device
-
-The gateway is `10.0.0.1/24`; CC networks behind CC routers live in
-`10.1.0.0/16`. `NAT=<uplink>` lets CC computers reach past the VM (the real
-network needn't know about them); leave it off for a first run.
+**The device.** The gateway is `10.0.0.1/24`; CC networks behind CC
+routers live in `10.1.0.0/16`. `NAT=<uplink>` lets CC computers reach past
+the VM; leave it off for a first run.
 
 ```sh
 NAT=eth0 ccnix-tun-setup minecraft 10.0.0.1/24 10.1.0.0/16
@@ -51,7 +89,8 @@ ip -br addr show ccnix0                  # UNKNOWN 10.0.0.1/24
 ip route | grep ccnix0                   # 10.0.0.0/24 and 10.1.0.0/16 dev ccnix0
 ```
 
-The device goes at reboot. A unit that remakes it before the server:
+It goes at reboot; this unit remakes it before the server
+(`systemctl enable --now ccnix-tun`):
 
 ```ini
 # /etc/systemd/system/ccnix-tun.service
@@ -69,37 +108,43 @@ ExecStart=/usr/local/sbin/ccnix-tun-setup minecraft 10.0.0.1/24 10.1.0.0/16
 WantedBy=multi-user.target
 ```
 
-`systemctl enable --now ccnix-tun`.
-
 ## 4. The server
 
 ```sh
-su - minecraft
-mkdir server && cd server
-curl -LO https://maven.neoforged.net/releases/net/neoforged/neoforge/21.1.252/neoforge-21.1.252-installer.jar
-java -jar neoforge-21.1.252-installer.jar --install-server .
-mkdir mods
-curl -Lo mods/cc-tweaked-1.21.1-forge-1.120.2.jar \
-  https://maven.squiddev.cc/cc/tweaked/cc-tweaked-1.21.1-forge/1.120.2/cc-tweaked-1.21.1-forge-1.120.2.jar
-cp ../ccnix-mod/build/libs/ccnix-0.1.0.jar mods/
-echo 'eula=true' > eula.txt
-echo '-Xms2G -Xmx4G' > user_jvm_args.txt
-tmux new -s mc ./run.sh nogui
+# VM
+install -d -o minecraft -g minecraft /srv/minecraft/server
+cd /srv/minecraft/server
+tar -xzf /root/server-bundle.tar.gz && chown -R minecraft:minecraft .
+su minecraft -c '
+  curl -sLO https://maven.neoforged.net/releases/net/neoforged/neoforge/21.1.256/neoforge-21.1.256-installer.jar
+  java -jar neoforge-21.1.256-installer.jar --install-server . && rm neoforge-21.1.256-installer.jar*
+  echo eula=true > eula.txt
+  echo "-Xms4G -Xmx6G" > user_jvm_args.txt
+'
+su minecraft -c 'tmux new -s mc ./run.sh nogui'
 ```
 
-(CC: Tweaked's "forge" build is the NeoForge one for 1.21.1; Modrinth has
-the same jar.) In the console once the world is up: `op <your name>`, so
-`/ccnix` works in game. Watch the log for `ccnix`: it says which ROM is in
-use (the jar's, at ccnix commit so-and-so). Detach with Ctrl+B D; `tmux
-attach -t mc` comes back.
+It's up at `Done (…s)! For help, type "help"`. The log on the way has
+hundreds of ERROR lines about loot tables, data maps and recipes for mods
+the pack doesn't have (railways' tracks for other mods' woods, and so on):
+the pack's, harmless. What matters:
 
-For later, a unit (`systemctl enable --now minecraft`; the console is then
-`/ccnix` in game, or rcon):
+- `ccnix ROM: <commit> from the mod, 126 files`: the ROM is in.
+- No `ccnix config:` warnings, and later `helper:` lines saying it started.
+
+In the console: `op <you>`, so `/ccnix` works in game. Ctrl+B D detaches;
+`su minecraft -c 'tmux attach -t mc'` comes back.
+
+`server.properties` was written on the first start; `motd`, `view-distance`
+and the like are yours. Keep `online-mode=true` (your Microsoft account).
+
+**As a service**, once it's right (`systemctl enable --now minecraft`;
+the console is then rcon, or `/` commands in game):
 
 ```ini
 # /etc/systemd/system/minecraft.service
 [Unit]
-Description=Minecraft (NeoForge, ccnix)
+Description=Minecraft (dma.space + ccnix)
 After=network.target ccnix-tun.service
 Wants=ccnix-tun.service
 
@@ -113,18 +158,33 @@ Restart=on-failure
 WantedBy=multi-user.target
 ```
 
-**The client** needs NeoForge 21.1.x, CC: Tweaked 1.120.2 and the same
-`ccnix-0.1.0.jar` in its `mods/`, for the gateway block.
+**Updating:** a new pack, or a new ccnix jar: on the desktop, section 1's
+fix-ups, `./gradlew build`, `helper/server-bundle.sh` again; on the VM,
+stop the server, `rm -rf mods`, untar (it brings `config/` again: keep a
+copy of `config/ccnix-server.toml` first), start.
 
-**A live ROM** (to test ccnix changes without rebuilding the jar): in the
-server folder, `git clone https://github.com/djt-code/ccnix ccnix-rom`;
-after a `git -C ccnix-rom pull`, `/reload` in game. Delete the folder and
-`/reload` to go back to the jar's.
+**A live ROM** (ccnix's Lua without rebuilding the jar): as `minecraft`
+in the server folder, `git clone https://github.com/djt-code/ccnix
+ccnix-rom`; after `git -C ccnix-rom pull`, `/reload` in game. Delete the
+folder and `/reload` to go back to the jar's.
 
-## 5. The gateway's config
+## 5. Joining from the desktop
 
-After the first world load: `world/serverconfig/ccnix-server.toml`. Edits
-apply while the server runs.
+CurseForge → dma.space → Play → Multiplayer → Add Server: `<vm>:25565`.
+The client and server must have the same mod set, give or take client-only
+mods: if the join fails with a mod mismatch, the screen names the mod;
+usually a CC: Tweaked 1.113.1 that a pack update turned back on (section
+1), or a ccnix jar older than the server's.
+
+**Without the pack**, to work on the mod alone, `./gradlew runServer` and
+`./gradlew runClient` in ccnix-mod run NeoForge with CC: Tweaked and ccnix
+only; that client can't join the pack's server.
+
+## 6. The gateway's config
+
+`config/ccnix-server.toml` in the server's folder (NeoForge 21.1 keeps
+server configs there, not under `world/serverconfig`). Edits apply while
+the server runs.
 
 ```toml
 [gateway]
@@ -141,7 +201,7 @@ The helper starts with the first gateway block loaded; the log says so, or
 "helper: ..." with what went wrong (no device: run the setup script; not
 `minecraft`'s: run it with the right user).
 
-## 6. In game: the gateway's network
+## 7. In game: the gateway's network
 
 Build, on one cable:
 
@@ -169,7 +229,7 @@ gateway's blocks, R as a neighbour, and packets carried. If `ping` says
 "host unreachable": R's `ip neigh` has no `gateway`; check the cable touches
 both the modem and the gateway block, and the channel is 4040 on both.
 
-## 7. In game: a VLAN behind R
+## 8. In game: a VLAN behind R
 
 A second cable, from a wired modem on R's LEFT, to two more computers A and
 B with wired modems. That cable carries VLAN 20, network `10.1.0.0/24`,
@@ -201,7 +261,7 @@ traceroute -n 10.1.0.6        # 10.0.0.2, then 10.1.0.6   (apt install tracerout
 
 `traceroute` from a real stack works because R answers time-exceeded, and
 the gateway converts it. If `ping 10.1.0.6` says nothing: the gateway has
-no route for 10.1.0.0/16 (section 5), or the VM has none for it on `ccnix0`
+no route for 10.1.0.0/16 (section 6), or the VM has none for it on `ccnix0`
 (section 3); `/ccnix` counts the drop.
 
 **TCP both ways.** On A: `nc -l 7`; on the VM: `nc 10.1.0.6 7`, type: the
@@ -230,7 +290,7 @@ script, and on the desktop a route to CC's networks through the VM, e.g.
 Windows `route add 10.0.0.0 mask 255.0.0.0 <vm address>`; then `telnet
 10.1.0.6` from there.
 
-## 8. When it doesn't
+## 9. When it doesn't
 
 | Where | Shows |
 |---|---|

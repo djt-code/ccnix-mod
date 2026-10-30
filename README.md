@@ -102,8 +102,9 @@ The **gateway** is the server's link onto the CC network, and the **server** is 
 
 ### Setting up a server
 
-The server has to be Linux, for the TUN device. [doc/ubuntu-server.md](doc/ubuntu-server.md) walks through a fresh
-Ubuntu VM, the server, and the gateway with a CC router and a VLAN behind it, end to end.
+The server has to be Linux, for the TUN device. [doc/ubuntu-server.md](doc/ubuntu-server.md) walks through a
+fresh Ubuntu VM with the dma.space modpack, your CurseForge client, and the gateway with a CC router and a VLAN behind
+it, end to end.
 
 1. **Build the helper** and put it on the server's path:
 
@@ -141,8 +142,8 @@ Ubuntu VM, the server, and the gateway with a CC router and a VLAN behind it, en
 3. **Install the mod.** Build it with `./gradlew build`, then put `build/libs/ccnix-<version>.jar` in the server's
    `mods/`. Clients need it too, for the block. It needs CC: Tweaked 1.120 or later.
 
-4. **Configure it** in `world/serverconfig/ccnix-server.toml`. Put a copy in `defaultconfigs/` to give new worlds
-   the same settings. Edits take effect while the server runs.
+4. **Configure it** in `config/ccnix-server.toml` in the server's folder (NeoForge 21.1 keeps server configs there).
+   Edits take effect while the server runs.
 
    | Key | Default | What |
    |---|---|---|
