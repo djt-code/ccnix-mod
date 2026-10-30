@@ -124,6 +124,14 @@ final class CcWorld {
         return lua(code).toString().getBytes(StandardCharsets.ISO_8859_1);
     }
 
+    /** Another of ccnix's libraries (lib/name.lua, beside net.lua) as the global name; its require("net") is N. */
+    CcWorld library(String name) throws Exception {
+        var path = Path.of(System.getProperty("ccnix.net")).resolveSibling(name + ".lua");
+        lua("require = function(n) assert(n == 'net', n) return N end");
+        state.globals().rawset(name, LuaThread.runMain(state, load(Files.newInputStream(path), "@lib/" + name + ".lua")).first());
+        return this;
+    }
+
     // ---------------------------------------------------------------------------------------------------------------
     // Running it
     // ---------------------------------------------------------------------------------------------------------------

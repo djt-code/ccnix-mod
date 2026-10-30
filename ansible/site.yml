@@ -16,7 +16,7 @@
   tasks:
     - name: Packages
       ansible.builtin.apt:
-        name: ["{{ java_package }}", gcc, libc6-dev, iptables, tmux, acl, curl]
+        name: ["{{ java_package }}", gcc, libc6-dev, iptables, tmux, acl, curl, git]   # git: /ccnix rom update
         update_cache: true
         cache_valid_time: 3600
 
@@ -120,7 +120,8 @@
 
     # The mod rewrites this file with its own comments, so it's written
     # whole only when missing, and after that just the keys are kept as
-    # set (the mod reloads them while the server runs).
+    # set (the mod reloads them while the server runs).  The routes only
+    # with ccnix_ansible_routes: else they're the ops' (/ccnix route).
     - name: The gateway's config, if there's none
       ansible.builtin.template:
         src: ccnix-server.toml.j2
@@ -134,15 +135,21 @@
         path: "{{ minecraft_dir }}/config/ccnix-server.toml"
         regexp: "^\\s*{{ item.key }} = "
         line: "\t{{ item.key }} = {{ item.value }}"
-      loop: "{{ ccnix_settings | dict2items }}"
+        insertafter: "^\\[{{ item.section }}\\]"      # (a key the file doesn't have yet: in its section)
+      loop: "{{ ccnix_settings + (ccnix_routes if ccnix_ansible_routes | bool else []) }}"
+      loop_control:
+        label: "{{ item.key }}"
       vars:
         ccnix_settings:
-          address: '"{{ ccnix_gateway_address }}"'
-          channel: "{{ ccnix_gateway_channel }}"
-          mac: '"{{ ccnix_gateway_mac }}"'
-          routes: "[{{ ccnix_gateway_routes | map('to_json') | join(', ') }}]"
-          helper: '"ccnix-tun"'
-          device: '"{{ ccnix_tun_device }}"'
+          - { section: gateway, key: address, value: '"{{ ccnix_gateway_address }}"' }
+          - { section: gateway, key: channel, value: "{{ ccnix_gateway_channel }}" }
+          - { section: gateway, key: mac, value: '"{{ ccnix_gateway_mac }}"' }
+          - { section: gateway, key: opRoutes, value: "{{ ccnix_op_routes | bool | lower }}" }
+          - { section: gateway, key: opMaxSubnet, value: "{{ ccnix_op_route_max_subnet }}" }
+          - { section: tun, key: helper, value: '"ccnix-tun"' }
+          - { section: tun, key: device, value: '"{{ ccnix_tun_device }}"' }
+        ccnix_routes:
+          - { section: gateway, key: routes, value: "[{{ ccnix_gateway_routes | map('to_json') | join(', ') }}]" }
 
     - name: eula.txt
       ansible.builtin.copy:

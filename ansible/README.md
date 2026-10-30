@@ -46,15 +46,29 @@ ansible/run-on-host.sh devserver server-bundle.tar.gz --check --diff
   helper needs no privileges, because the TUN device belongs to
   `minecraft`.
 - **`ccnix-tun.service`** (root, oneshot) makes the device at boot with
-  `ccnix-tun-setup`, before the server: its address, routes into it,
-  forwarding (`ccnix_forward`), NAT (`ccnix_nat`).
+  `ccnix-tun-setup`, before the server: its address, routes into it
+  (`ccnix_tun_networks`, in table `ccnix_tun_table`, after the host's own
+  routes), forwarding (`ccnix_forward`), NAT (`ccnix_nat`).
 - **`minecraft.service`** runs `run.sh nogui` in a tmux session, and stops
   it with `stop` at the console. `mc-console` attaches to it (Ctrl+B D
   leaves); `mc-cmd "op <you>"` types a command.
 - **A new bundle** stops the server, replaces `mods/` and unpacks the
   pack's `config/` and `defaultconfigs/` over the old, then starts it.
   `config/ccnix-server.toml`'s keys are set from the variables every run
-  (the mod keeps its own comments in the file).
+  (the mod keeps its own comments in the file), the routes only with
+  `ccnix_ansible_routes`.
+
+**The gateway's routes** belong to the play or to the ops, as two
+variables say:
+
+| `ccnix_op_routes` | `ccnix_ansible_routes` | |
+|---|---|---|
+| `true` | `false` | ops change them in game (`/ccnix route add\|del`); the play writes `ccnix_gateway_routes` into a new config only (the default) |
+| `true` | `true` | ops change them, and each run puts `ccnix_gateway_routes` back |
+| `false` | `true` | the play's alone |
+
+Ops' routes are no larger than `ccnix_op_route_max_subnet` (16: a /16)
+and inside `ccnix_tun_networks`; they never reach the host's routing.
 
 `server.properties` keys not in `server_properties` are the server's own:
 edit them on the host, and the play leaves them alone.

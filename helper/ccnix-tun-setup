@@ -9,38 +9,55 @@
 #   ADDRESS   the server's address on the device: the gateway's address in
 #             the mod's config (10.0.0.1/24 unless you changed it), so
 #             packets CC sends to the gateway reach the server
-#   NETWORK   CC's networks behind CC routers, the mod's routes (or one
-#             network holding them all, 10.0.0.0/8): the server sends
-#             their packets into the device too
+#   NETWORK   CC's networks behind CC routers (or one holding them all,
+#             10.0.0.0/8): the server sends their packets into the device.
+#             The gateway's routes, ops' included, have to be inside these.
+#
+# The networks go in a routing table of their own, TABLE, looked at after
+# the host's own routes (all but its default route: the rule "lookup main
+# suppress_prefixlength 0" comes first).  So a network here can never take
+# the host's LAN, its gateway or any route it has: it only stands in for
+# the default route, for the addresses in it.
 #
 # From the environment:
 #   DEVICE=ccnix0   the device's name (the mod's tun.device)
-#   FORWARD=1         turn on IPv4 forwarding, so the server routes between
-#                     CC's networks (through the gateway) and its own
-#   NAT=eth0          and masquerade CC's networks going out of eth0, so
-#                     the real network needn't know about them (FORWARD too)
+#   TABLE=4040      the routing table, and the rules' priority (TABLE and
+#                   TABLE + 1)
+#   FORWARD=1       turn on IPv4 forwarding, so the server routes between
+#                   CC's networks (through the gateway) and its own
+#   NAT=eth0        and masquerade CC's networks going out of eth0, so
+#                   the real network needn't know about them (FORWARD too)
 #
 #   ccnix-tun-setup minecraft 10.0.0.1/24 10.1.0.0/16
 #   NAT=eth0 ccnix-tun-setup minecraft 10.0.0.1/24 10.0.0.0/8
 #
-# Running it again changes nothing that's already right.
+# Running it again leaves things as it says, whatever was there before.
 set -e
 
 if [ $# -lt 1 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-    sed -n '2,26s/^# \{0,1\}//p' "$0"
+    sed -n '2,32s/^# \{0,1\}//p' "$0"
     exit 2
 fi
 user=$1
 addr=${2:-10.0.0.1/24}
 [ $# -gt 1 ] && shift 2 || shift
 dev=${DEVICE:-ccnix0}
+table=${TABLE:-4040}
 
 ip link show "$dev" >/dev/null 2>&1 || ip tuntap add dev "$dev" mode tun user "$user"
 ip addr replace "$addr" dev "$dev"
 ip link set "$dev" up
+
+# the networks, in their table and nowhere else (older versions put them in main)
+ip route flush dev "$dev" proto boot 2>/dev/null || true
+ip route flush table "$table" 2>/dev/null || true
 for net in "$@"; do
-    ip route replace "$net" dev "$dev"
+    ip route replace "$net" dev "$dev" table "$table"
 done
+while ip rule del pref "$table" 2>/dev/null; do :; done
+while ip rule del pref $((table + 1)) 2>/dev/null; do :; done
+ip rule add pref "$table" lookup main suppress_prefixlength 0
+ip rule add pref $((table + 1)) lookup "$table"
 
 if [ -n "$FORWARD" ] || [ -n "$NAT" ]; then
     sysctl -q -w net.ipv4.ip_forward=1
@@ -52,4 +69,4 @@ if [ -n "$NAT" ]; then
     done
 fi
 
-echo "$dev: $addr, for $user${*:+; routes $*}${NAT:+; masquerading out of $NAT}"
+echo "$dev: $addr, for $user${*:+; routes $* (table $table)}${NAT:+; masquerading out of $NAT}"

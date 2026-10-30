@@ -28,6 +28,19 @@ ccnix_gateway_channel: 4040
 ccnix_gateway_mac: gateway
 ccnix_gateway_routes: ["10.1.0.0/16 via 10.0.0.2"]   # CC networks behind CC routers
 ccnix_tun_device: ccnix0
-ccnix_tun_networks: ["10.1.0.0/16"]                  # routed into the device on the server
+# Routed into the device on the server, in a routing table of their own
+# (ccnix_tun_table) that the host's own routes come before.  Every gateway
+# route, ops' too, has to be inside one of these.
+ccnix_tun_networks: ["10.0.0.0/8"]
+ccnix_tun_table: 4040
 ccnix_forward: true             # the server routes between CC's networks and its LAN
 ccnix_nat: ""                   # an uplink name (eth0) to masquerade CC's networks out of it
+
+# Who owns the gateway's routes.  ccnix_op_routes: ops may change them in
+# game (/ccnix route add|del), within ccnix_tun_networks and no larger
+# than a /ccnix_op_route_max_subnet.  ccnix_ansible_routes: every run sets
+# them to ccnix_gateway_routes, replacing what ops changed; off, the play
+# writes them only into a new config and leaves them alone after.
+ccnix_op_routes: true
+ccnix_op_route_max_subnet: 16
+ccnix_ansible_routes: false

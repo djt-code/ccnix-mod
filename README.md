@@ -5,7 +5,7 @@ A Minecraft mod (NeoForge 1.21.1, with CC: Tweaked) with two parts:
 - **The ROM.** [ccnix](https://github.com/djt-code/ccnix)'s programs go into every computer's ROM: the
   shell `ccsh`, the POSIX utilities, `git`, the network stack, `init` and the services, telnet, and the turtle
   programs. They're on the path at every boot, with nothing to install. Each computer can pull updates over its ROM
-  with `ccnix update`, and the server's admin updates the ROM itself with `git pull`.
+  with `ccnix update`, and the server's ops update the ROM itself with `/ccnix rom update`.
 - **The Network Gateway.** A block on CC cables that joins ComputerCraft's wired network to a real one through a TUN
   device on the server. A real machine can `telnet` to a CC computer running `telnetd`, `ping` it, or `nc` to it, and
   a CC computer can reach anything the server can reach.
@@ -40,21 +40,17 @@ The ROM comes from one of two places:
 - **A checkout.** If the server's folder has `ccnix-rom/`, a git checkout of the ccnix repo, the ROM comes from there
   instead.
 
-To set up a checkout:
+`/ccnix rom update` (permission level 3, in game or at the server console) does it all while the server runs: it
+clones the repo the ROM came from into `ccnix-rom/` the first time (its branch, shallow), `git pull --ff-only`s it
+after that, and reloads the data packs, which rebuilds the ROM. It needs `git` on the server. By hand, the same is:
 
 ```sh
 cd /path/to/server
-git clone https://github.com/djt-code/ccnix ccnix-rom
+git clone https://github.com/djt-code/ccnix ccnix-rom     # once
+git -C ccnix-rom pull                                    # each update
 ```
 
-To update it:
-
-```sh
-git -C ccnix-rom pull
-```
-
-Then run `/reload` in game, or from the server console. Computers see the new files at once; boot changes apply at
-their next boot.
+then `/reload`. Computers see the new files at once; boot changes apply at their next boot.
 
 - **What's served:** the files in the checkout's folders, as they are on disk, so a local edit is served too. The
   commit and its time come from `git` on the server.
@@ -112,12 +108,17 @@ it, end to end.
    cc -O2 -Wall -o /usr/local/bin/ccnix-tun helper/ccnix-tun.c
    ```
 
-2. **Make the device** as root, for the user the server runs as. Give it the gateway's address, and a route for CC's
-   networks behind routers:
+2. **Make the device** as root, for the user the server runs as. Give it the gateway's address, and the networks CC
+   routers will have behind them (one big one is simplest):
 
    ```sh
-   sudo helper/ccnix-tun-setup minecraft 10.0.0.1/24 10.1.0.0/16
+   sudo helper/ccnix-tun-setup minecraft 10.0.0.1/24 10.0.0.0/8
    ```
+
+   - The networks go in a routing table of their own (4040, or `TABLE=`), which the host's own routes come before
+     (all but its default route). So they can't take the host's LAN, its gateway or any route it has: they only
+     stand in for the default route, for the addresses in them. Every route the gateway has, ops' too, has to be
+     inside one of them. `ip route show table 4040` lists them.
 
    - `FORWARD=1` lets the server route between CC's networks and its own.
    - `NAT=eth0` also masquerades CC's networks going out of `eth0`. With it, CC computers can reach the real
@@ -151,6 +152,8 @@ it, end to end.
    | `gateway.channel` | `4040` | The modem channel: 4040 is ccnix's untagged network, 4040 + n is VLAN n. |
    | `gateway.mac` | `gateway` | Its MAC on the CC network. |
    | `gateway.routes` | `[]` | Networks behind CC routers: `["10.1.0.0/16 via 10.0.0.2"]`. The longest match wins. |
+   | `gateway.opRoutes` | `false` | Ops may change the routes in game (`/ccnix route add\|del`). |
+   | `gateway.opMaxSubnet` | `16` | The largest network an op may route, as a prefix length: 16 allows a /16 or smaller. |
    | `tun.helper` | `ccnix-tun` | The helper, with any arguments before the device's name. |
    | `tun.device` | `ccnix0` | The TUN device. |
 
@@ -162,6 +165,20 @@ it, end to end.
    - the helper's state.
 
    The server log has the helper's messages.
+
+6. **Routes in game.** `/ccnix route` shows the gateway's routes and the server's routes into the device. With
+   `gateway.opRoutes` on, ops (permission level 3) change them while the server runs, and the change is saved in the
+   config:
+
+   ```
+   /ccnix route add 10.2.0.0/16 via 10.0.0.3
+   /ccnix route del 10.2.0.0/16
+   ```
+
+   A route an op adds has to be a network's own address, no larger than `gateway.opMaxSubnet`, behind a router on
+   the gateway's network, clear of the gateway's own network, and inside a network the server routes into the
+   device. It only tells the gateway which CC router has that network: nothing an op does reaches the server's own
+   routing, and no part of the game needs root.
 
 ### On the CC side
 

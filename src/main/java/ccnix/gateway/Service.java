@@ -3,9 +3,12 @@ package ccnix.gateway;
 import com.mojang.logging.LogUtils;
 import ccnix.Config;
 import ccnix.gateway.core.Gateway;
+import ccnix.gateway.core.OpRoutes;
 import ccnix.gateway.core.Settings;
 import org.slf4j.Logger;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -79,11 +82,34 @@ public final class Service {
         tun.start();
     }
 
-    private static Settings settings() {
+    /** The settings the config gives (what can't be used is logged and left out). */
+    public static Settings settings() {
         var problems = new ArrayList<String>();
         var s = Settings.parse(Config.ADDRESS.get(), Config.CHANNEL.get(), Config.MAC.get(), Config.ROUTES.get(), problems);
         for (var p : problems) LOG.warn("ccnix config: {}", p);
         return s;
+    }
+
+    /**
+     * The routes the server has into the TUN device, in any table, as {@code ip} shows them (no privileges needed).
+     * Throws if they can't be read: no {@code ip} (not Linux), no such device.
+     */
+    public static List<OpRoutes.HostRoute> hostRoutes() throws IOException {
+        var device = Config.DEVICE.get();
+        var p = new ProcessBuilder("ip", "-4", "route", "show", "table", "all", "dev", device).redirectErrorStream(true).start();
+        p.getOutputStream().close();
+        var out = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        try {
+            if (!p.waitFor(5, TimeUnit.SECONDS)) {
+                p.destroy();
+                throw new IOException("ip took too long");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("interrupted");
+        }
+        if (p.exitValue() != 0) throw new IOException(out.isBlank() ? "ip failed" : out.trim());
+        return OpRoutes.parseIpRoutes(out);
     }
 
     // ---------------------------------------------------------------------------------------------------------------

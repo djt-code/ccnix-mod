@@ -87,14 +87,18 @@ install -m 755 /root/ccnix-tun-setup /usr/local/sbin/
 ```
 
 **The device.** The gateway is `10.0.0.1/24`; CC networks behind CC
-routers live in `10.1.0.0/16`. `NAT=<uplink>` lets CC computers reach past
+routers live in `10.0.0.0/8`. `NAT=<uplink>` lets CC computers reach past
 the VM; leave it off for a first run.
 
 ```sh
-NAT=eth0 ccnix-tun-setup minecraft 10.0.0.1/24 10.1.0.0/16
+NAT=eth0 ccnix-tun-setup minecraft 10.0.0.1/24 10.0.0.0/8
 ip -br addr show ccnix0                  # UNKNOWN 10.0.0.1/24
-ip route | grep ccnix0                   # 10.0.0.0/24 and 10.1.0.0/16 dev ccnix0
+ip route show table 4040                 # 10.0.0.0/8 dev ccnix0
+ip rule | grep 404                       # main without its default route first, then table 4040
 ```
+
+CC's networks are in a table of their own, after the VM's own routes, so
+they can't take its LAN or its gateway away from it.
 
 It goes at reboot; this unit remakes it before the server
 (`systemctl enable --now ccnix-tun`):
@@ -109,7 +113,7 @@ Before=minecraft.service
 Type=oneshot
 RemainAfterExit=yes
 Environment=NAT=eth0
-ExecStart=/usr/local/sbin/ccnix-tun-setup minecraft 10.0.0.1/24 10.1.0.0/16
+ExecStart=/usr/local/sbin/ccnix-tun-setup minecraft 10.0.0.1/24 10.0.0.0/8
 
 [Install]
 WantedBy=multi-user.target
@@ -170,9 +174,9 @@ fix-ups, `./gradlew build`, `helper/server-bundle.sh` again; on the VM,
 stop the server, `rm -rf mods`, untar (it brings `config/` again: keep a
 copy of `config/ccnix-server.toml` first), start.
 
-**A live ROM** (ccnix's Lua without rebuilding the jar): as `minecraft`
-in the server folder, `git clone https://github.com/djt-code/ccnix
-ccnix-rom`; after `git -C ccnix-rom pull`, `/reload` in game. Delete the
+**A live ROM** (ccnix's Lua without rebuilding the jar): `/ccnix rom
+update` in game (or `mc-cmd "ccnix rom update"`) clones the repo into
+`ccnix-rom/` the first time, pulls it after, and reloads. Delete the
 folder and `/reload` to go back to the jar's.
 
 ## 5. Joining from the desktop
@@ -199,6 +203,8 @@ the server runs.
     channel = 4040
     mac = "gateway"
     routes = ["10.1.0.0/16 via 10.0.0.2"]      # the CC router below
+    opRoutes = true                            # ops may /ccnix route add|del
+    opMaxSubnet = 16                           # a /16 at most
 [tun]
     helper = "ccnix-tun"
     device = "ccnix0"

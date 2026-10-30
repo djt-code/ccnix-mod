@@ -7,6 +7,7 @@ Before=minecraft.service
 Type=oneshot
 RemainAfterExit=yes
 Environment=DEVICE={{ ccnix_tun_device }}
+Environment=TABLE={{ ccnix_tun_table }}
 {% if ccnix_forward %}
 Environment=FORWARD=1
 {% endif %}

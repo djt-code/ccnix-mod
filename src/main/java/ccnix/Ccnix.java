@@ -3,12 +3,9 @@ package ccnix;
 import ccnix.gateway.GatewayBlock;
 import ccnix.gateway.GatewayBlockEntity;
 import ccnix.gateway.Service;
-import ccnix.rom.Rom;
 import ccnix.rom.RomPack;
 import dan200.computercraft.api.network.wired.WiredElementCapability;
-import net.minecraft.commands.Commands;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.level.block.SoundType;
@@ -31,10 +28,6 @@ import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
-
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * ccnix: the ccnix repo's programs in every computer's ROM (ccnix.rom), and the Network Gateway, a block joining CC's
@@ -72,27 +65,6 @@ public final class Ccnix {
 
         NeoForge.EVENT_BUS.addListener((ServerStartingEvent e) -> Service.start());
         NeoForge.EVENT_BUS.addListener((ServerStoppedEvent e) -> Service.stop());
-        NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent e) -> e.getDispatcher().register(
-            Commands.literal("ccnix").requires(s -> s.hasPermission(2)).executes(ctx -> {
-                for (var line : status()) ctx.getSource().sendSuccess(() -> Component.literal(line), false);
-                return 1;
-            })));
-    }
-
-    /** What /ccnix shows: the ROM, then the gateway. */
-    private static List<String> status() {
-        var out = new ArrayList<String>();
-        Rom rom = RomPack.current();
-        if (rom == null) {
-            out.add("ROM: not loaded");
-        } else {
-            out.add("ROM: ccnix " + rom.commit.substring(0, Math.min(7, rom.commit.length()))
-                + (rom.date > 0 ? " (" + Instant.ofEpochSecond(rom.date) + ")" : "") + ", " + rom.files.size()
-                + " files, from " + rom.source);
-            out.add("  computers update from " + rom.url + " " + rom.branch
-                + "; " + Rom.CHECKOUT + "/ in the server's folder (git) and /reload change it");
-        }
-        for (var line : Service.status()) out.add("gateway: " + line);
-        return out;
+        NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent e) -> CcnixCommand.register(e.getDispatcher()));
     }
 }

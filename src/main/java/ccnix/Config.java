@@ -6,8 +6,7 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 import java.util.List;
 
 /**
- * The server config, serverconfig/ccnix-server.toml in the world (defaultconfigs/ gives new worlds theirs).
- * Edits take effect while the server runs.
+ * The server config, config/ccnix-server.toml in the server's folder. Edits take effect while the server runs.
  */
 public final class Config {
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
@@ -34,8 +33,19 @@ public final class Config {
     public static final ModConfigSpec.ConfigValue<List<? extends String>> ROUTES = BUILDER
         .comment("Networks behind CC routers on the gateway's network, and the router for each:",
             "[\"10.1.0.0/16 via 10.0.0.2\", \"10.2.0.0/16 via 10.0.0.3\"]. The gateway takes the longest match.",
-            "The server needs a route for each into the TUN device too (or one for all of them).")
+            "The server routes networks into the TUN device too (helper/ccnix-tun-setup): each route here needs to be",
+            "inside one of those for anything from outside to reach it.")
         .defineListAllowEmpty("routes", List.of(), () -> "10.1.0.0/16 via 10.0.0.2", o -> o instanceof String);
+
+    public static final ModConfigSpec.BooleanValue OP_ROUTES = BUILDER
+        .comment("Ops may change the routes in game: /ccnix route add <net/len> via <router>, /ccnix route del <net/len>",
+            "(permission level 3). Only inside the networks the server routes into the TUN device, so nothing an op",
+            "adds reaches the server's own routing.")
+        .define("opRoutes", false);
+
+    public static final ModConfigSpec.IntValue OP_MAX_SUBNET = BUILDER
+        .comment("The largest network an op may route, as a prefix length: 16 lets an op route a /16 or anything smaller.")
+        .defineInRange("opMaxSubnet", 16, 1, 32);
 
     static {
         BUILDER.pop().comment("The helper that holds the TUN device (helper/ccnix-tun.c).").push("tun");

@@ -87,6 +87,21 @@ final class Packets {
         return sum(p, ihl, total - ihl, pseudo) == 0;
     }
 
+    /** The UDP payload of an IPv4 packet. */
+    static byte[] udpData(byte[] p) {
+        int ihl = (p[0] & 15) * 4, total = u16(p, 2);
+        var out = new byte[total - ihl - 8];
+        System.arraycopy(p, ihl + 8, out, 0, out.length);
+        return out;
+    }
+
+    /** Bytes from hex. */
+    static byte[] hex(String s) {
+        var out = new byte[s.length() / 2];
+        for (int i = 0; i < out.length; i++) out[i] = (byte) Integer.parseInt(s.substring(2 * i, 2 * i + 2), 16);
+        return out;
+    }
+
     /** The TCP payload of an IPv4 packet. */
     static byte[] tcpData(byte[] p) {
         int ihl = (p[0] & 15) * 4, off = (u8(p, ihl + 12) >> 4) * 4, total = u16(p, 2);

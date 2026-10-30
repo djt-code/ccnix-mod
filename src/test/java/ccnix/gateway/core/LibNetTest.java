@@ -91,6 +91,30 @@ class LibNetTest {
     }
 
     @Test
+    void dnsThroughTheServer() throws Exception {
+        // lib/netdb's question goes out as a real DNS query, and a real resolver's answer (one 1.1.1.1 gave: a CNAME,
+        // then the address, the names compressed) comes back to it byte for byte
+        w.library("netdb");
+        w.lua("port = A.udpOpen(); assert(A.udpSend(port, '192.0.2.53', 53, netdb.dnsQuery(0x1234, 'www.github.com', 'A')))");
+        w.pump(0.2);
+        assertEquals(1, w.outside.size());
+        var q = w.outside.remove(0);
+        assertTrue(checksumsOk(q));
+        assertEquals(UDP, u8(q, 9));
+        assertEquals(53, u16(q, 22));
+        assertArrayEquals(hex("123401000001000000000000037777770667697468756203636f6d0000010001"), udpData(q));
+        w.fromOutside(udp("192.0.2.53", 53, "10.0.0.5", u16(q, 20), hex("123481800001000200000000037777770667697468756203636f6d"
+            + "0000010001c00c0005000100000b380002c010c010000100010000000f00048c527403")));
+        w.pump(0.2);
+        assertEquals("github.com 140.82.116.3", w.luaString("""
+            local d = A.udpTake(port)
+            local m = netdb.dnsParse(d.data)
+            return m.answers[1].data .. " " .. m.answers[2].data"""));
+    }
+
+    static final int UDP = 17;
+
+    @Test
     void aRealClientConnects() {
         w.lua("assert(B.tcpListen(23))");
         String me = "192.168.1.50", b = "10.1.0.6";
