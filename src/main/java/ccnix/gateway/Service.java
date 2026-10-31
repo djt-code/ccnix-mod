@@ -278,8 +278,8 @@ public final class Service {
         if (e == null || g == null) return List.of("the gateway isn't running");
         var s = settings();
         var out = new ArrayList<String>();
-        out.add("on the exchange: the gateway is " + s.address() + " (" + mode + " mode), channel " + s.channel()
-            + "; VLANs carried: " + Gateway.says(vlans()));
+        out.add("on the exchange: the gateway is " + s.address() + " (" + mode + " mode), channel " + s.channel());
+        out.add("VLANs the server carries: " + Gateway.says(vlans()) + " (VLAN 1 is the exchange, untagged)");
         try {
             out.addAll(e.submit(() -> g.portStatus(p)).get(2, TimeUnit.SECONDS));
         } catch (Exception ex) {

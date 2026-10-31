@@ -30,7 +30,8 @@ import java.util.UUID;
  * A gateway block: a node on CC's wired network (a cable joins it at its port, the side it faces) that
  * hears every packet on it and passes those on the gateway's channel and its VLANs' to the gateway, and sends the
  * gateway's frames (its own, and other blocks' it carries) into it. Each has an ID and the player who placed it,
- * and its own filter: whether it passes untagged frames (the exchange) and which VLANs, both ways.
+ * and, as a switch's trunk port has, its own list of VLANs (1, the exchange, among them by default) and its native
+ * VLAN: the one its cable's untagged frames are on (1 unless set, or none).
  */
 public final class GatewayBlockEntity extends BlockEntity implements Gateway.Port {
     /** The blocks' beacon: on a channel no modem can open, so only blocks hear it. */
@@ -45,7 +46,7 @@ public final class GatewayBlockEntity extends BlockEntity implements Gateway.Por
     private UUID owner;
     private String ownerName = "";
     private boolean warned;
-    private volatile boolean untagged = true;
+    private volatile int nativeVlan = 1;
     private volatile String vlanSpec = ALL_VLANS;
     private volatile java.util.BitSet vlanSet = Gateway.vlans(ALL_VLANS, new ArrayList<>());
 
@@ -115,7 +116,7 @@ public final class GatewayBlockEntity extends BlockEntity implements Gateway.Por
         if (owner != null) tag.putUUID("owner", owner);
         if (!ownerName.isEmpty()) tag.putString("ownerName", ownerName);
         if (warned) tag.putBoolean("warned", true);
-        if (!untagged) tag.putBoolean("noUntagged", true);
+        if (nativeVlan != 1) tag.putInt("nativeVlan", nativeVlan);
         if (!vlanSpec.equals(ALL_VLANS)) tag.putString("vlans", vlanSpec);
     }
 
@@ -126,14 +127,26 @@ public final class GatewayBlockEntity extends BlockEntity implements Gateway.Por
         owner = tag.hasUUID("owner") ? tag.getUUID("owner") : null;
         ownerName = tag.getString("ownerName");
         warned = tag.getBoolean("warned");
-        untagged = !tag.getBoolean("noUntagged");
         vlanSpec = tag.contains("vlans") ? tag.getString("vlans") : ALL_VLANS;
         vlanSet = Gateway.vlans(vlanSpec, new ArrayList<>());
+        if (tag.contains("nativeVlan")) {
+            nativeVlan = tag.getInt("nativeVlan");
+        } else if (tag.getBoolean("noUntagged")) {      // (0.8-0.10: untagged off, VLAN 1 meant tagged)
+            nativeVlan = 0;
+        } else if (!vlanSet.get(1)) {                   // (untagged on, and so the exchange: keep it)
+            vlanSet.set(1);
+            vlanSpec = Gateway.says(vlanSet).replace(" ", "");
+        }
     }
 
     @Override
     public boolean carries(int vlan) {
-        return vlan == 0 ? untagged : vlanSet.get(vlan);
+        return vlanSet.get(vlan);
+    }
+
+    @Override
+    public int nativeVlan() {
+        return nativeVlan;
     }
 
     /** Its owner may change its filter, and an op may change any block's. */
@@ -141,14 +154,27 @@ public final class GatewayBlockEntity extends BlockEntity implements Gateway.Por
         return player.getUUID().equals(owner) || player.hasPermissions(2);
     }
 
-    /** A new filter, or what's wrong with it (nothing changed then). */
-    String filter(boolean untagged, String vlans) {
+    /** A new list and native VLAN ("1"-"4094", or "none"), or what's wrong with them (nothing changed then). */
+    String filter(String vlans, String nativeSpec) {
         var problems = new ArrayList<String>();
         var set = Gateway.vlans(vlans, problems);
         if (!problems.isEmpty()) return problems.get(0);
-        this.untagged = untagged;
+        int n;
+        var ns = nativeSpec.trim();
+        if (ns.isEmpty() || ns.equalsIgnoreCase("none")) {
+            n = 0;
+        } else {
+            try {
+                n = Integer.parseInt(ns);
+            } catch (NumberFormatException e) {
+                n = -1;
+            }
+            if (n < 1 || n > Gateway.VLAN_MAX) return "The native VLAN \"" + ns + "\" isn't 1-4094 or none";
+            if (!set.get(n)) return "The native VLAN " + n + " isn't in the block's VLANs";
+        }
         vlanSpec = vlans.trim();
         vlanSet = set;
+        nativeVlan = n;
         setChanged();
         return null;
     }
@@ -156,7 +182,8 @@ public final class GatewayBlockEntity extends BlockEntity implements Gateway.Por
     /** Its dialog, on player's screen, with what the last change said. */
     void openFor(ServerPlayer player, String message) {
         net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
-            new GatewayScreenData(worldPosition, stats(), untagged, vlanSpec, mayChange(player), message));
+            new GatewayScreenData(worldPosition, stats(), vlanSpec, nativeVlan == 0 ? "none" : String.valueOf(nativeVlan),
+                mayChange(player), message));
     }
 
     private void scheduleConnect() {
@@ -238,8 +265,6 @@ public final class GatewayBlockEntity extends BlockEntity implements Gateway.Por
         var out = new ArrayList<String>();
         out.add(name() + (owner == null ? "" : ", placed by " + ownerName) + ", at " + where());
         out.addAll(Service.portStatus(this));
-        out.add("its filter: " + (untagged ? "untagged" : "no untagged") + ", VLANs "
-            + (vlanSet.isEmpty() ? "none" : Gateway.says(vlanSet)));
         return out;
     }
 

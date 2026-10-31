@@ -83,22 +83,26 @@ answer is the one exception). Programs on the computers do everything above that
 
 ### The exchange
 
-Every gateway block, wherever it is, joins one exchange: a switch whose ports are the blocks. The CC networks behind
-all of them are one network on the gateway's untagged channel (10.0.0.0/24: routers on different blocks reach each
-other at their addresses there, and the gateway is one host on it), and one more for each VLAN carried
-(`gateway.vlans`, all by default: a router's `back.20` on one block reaches `back.20` on another). A frame goes to the
-block its MAC was last heard on, a broadcast to all of them.
+Every gateway block, wherever it is, joins one exchange: a switch whose trunk ports are the blocks, as Cisco's,
+Juniper's and Extreme's switches have them. Inside it every frame is on a VLAN, 1-4094, and **VLAN 1 is the exchange
+itself**: 10.0.0.0/24, where routers on different blocks reach each other at their addresses and the gateway is one
+host. On a block's cable its **native VLAN** (1 unless its owner sets it, or none) is untagged, on the gateway's
+channel, and every other VLAN is tagged, on the channel + its number (lib/net's `back.20`); a tagged frame for the
+native VLAN is dropped. So a router's `back.20` on one block reaches `back.20` on another, and plain computers (`back`)
+behind two blocks with native VLAN 10 share a private LAN, apart from the exchange. A frame goes to the block its MAC
+was last heard on, a broadcast to all of them; `gateway.vlans` (all by default) is what any block may carry.
 
 - **One block per cable network.** Blocks on the same cable network hear each other's beacons (on a channel no modem
   opens); the first placed works and the others stand by, carrying nothing, until it goes (broken, or its chunk
   unloaded): a spare, not a loop. Its owner is told once, and its right-click says so.
 - **IDs and owners.** Each block gets an ID when placed, and remembers who placed it. A player may have
   `gateway.maxPerPlayer` (5) placed; `/ccnix gateways` lists them all.
-- **Right-click** one with an empty hand for its dialog: its ID and owner, frames in and out, the MACs heard behind it,
-  the VLANs seen, whether it stands by, and its own filter.
-- **Each block's filter** (in its dialog; its owner's to change, or an op's): whether it passes untagged frames (the
-  exchange: untick it, and the block is a VLAN trunk with no way to the gateway itself) and which VLANs
-  (`"1-4094"`, the default, `"10,20,100-199"`, or empty for none), both ways, within `gateway.vlans`.
+- **Right-click** one with an empty hand for its dialog: its ID and owner, frames in and out (and filtered), the MACs
+  heard behind it, the VLANs seen, whether it stands by, and its VLANs.
+- **Each block's VLANs** (in its dialog; its owner's to change, or an op's), as a trunk port's: the VLANs it carries
+  (`"1-4094"`, the default; `"2-4094"` a trunk with no way onto the exchange or to the gateway; `"1,10,20-29"`) and
+  its native VLAN (a number in that list, or `none` to drop untagged frames). With a native VLAN other than 1, the
+  exchange reaches its cable tagged, as `back.1`.
 
 ### NAT mode
 
@@ -220,7 +224,7 @@ it, end to end.
    | `gateway.routes` | `[]` | Networks behind CC routers: `["10.1.0.0/16 via 10.0.0.2"]`. The longest match wins. |
    | `gateway.opRoutes` | `false` | Ops may change the routes in game (`/ccnix route add\|del`). Always on in singleplayer, where the player is the admin. |
    | `gateway.opMaxSubnet` | `16` | The largest network an op may route, as a prefix length: 16 allows a /16 or smaller. |
-   | `gateway.vlans` | `1-4094` | The VLANs the blocks carry between them, besides the untagged exchange (`"10,20,100-199"`; `""` none). |
+   | `gateway.vlans` | `1-4094` | The VLANs any gateway block may carry; VLAN 1 is the exchange (`"1,10,20-29"`). |
    | `gateway.maxPerPlayer` | `5` | How many gateway blocks one player may have placed (0: any number). |
    | `nat.*` | | NAT mode: `deny`, `allow`, `maxPerComputer`, `maxTotal`, `tcpIdle`, `udpIdle`, `dnsRelay`, `forwards`, `opForwards`, `opForwardPorts` (above). |
    | `tun.helper` | `ccnix-tun` | The helper, with any arguments before the device's name. |

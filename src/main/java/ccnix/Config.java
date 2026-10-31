@@ -63,9 +63,10 @@ public final class Config {
         .defineInRange("opMaxSubnet", 16, 1, 32);
 
     public static final ModConfigSpec.ConfigValue<String> VLANS = BUILDER
-        .comment("Every gateway block joins one exchange: the untagged channel above (the gateway's network, where CC",
-            "routers peer) and these VLANs (lib/net's \"back.20\": channel + 20), carried between the blocks.",
-            "\"1-4094\", \"10,20,100-199\", or \"\" for the untagged exchange alone.")
+        .comment("Every gateway block joins one exchange, a switch whose trunk ports are the blocks: the VLANs it may",
+            "carry, \"1-4094\" or \"1,10,20-29\". VLAN 1 is the exchange itself (the gateway's network, where CC",
+            "routers peer). On a block's cable its native VLAN (1 unless its owner sets it) is untagged, on the channel",
+            "above, and every other VLAN tagged, on the channel + its number (lib/net's \"back.20\").")
         .define("vlans", "1-4094");
 
     public static final ModConfigSpec.IntValue MAX_PER_PLAYER = BUILDER

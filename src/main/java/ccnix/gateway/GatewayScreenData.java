@@ -15,17 +15,17 @@ import java.util.List;
 
 /**
  * Server to client: a gateway block's dialog, opened by its right-click (and again after a change): its lines, its
- * filter, whether this player may change it, and what the last change said.
+ * VLANs and native VLAN, whether this player may change them, and what the last change said.
  */
-public record GatewayScreenData(BlockPos pos, List<String> lines, boolean untagged, String vlans, boolean canEdit,
+public record GatewayScreenData(BlockPos pos, List<String> lines, String vlans, String nativeVlan, boolean canEdit,
                                 String message) implements CustomPacketPayload {
     public static final Type<GatewayScreenData> TYPE =
         new Type<>(ResourceLocation.fromNamespaceAndPath(Ccnix.ID, "gateway_screen"));
     public static final StreamCodec<RegistryFriendlyByteBuf, GatewayScreenData> STREAM_CODEC = StreamCodec.composite(
         BlockPos.STREAM_CODEC, GatewayScreenData::pos,
         ByteBufCodecs.STRING_UTF8.apply(ByteBufCodecs.list()), GatewayScreenData::lines,
-        ByteBufCodecs.BOOL, GatewayScreenData::untagged,
         ByteBufCodecs.STRING_UTF8, GatewayScreenData::vlans,
+        ByteBufCodecs.STRING_UTF8, GatewayScreenData::nativeVlan,
         ByteBufCodecs.BOOL, GatewayScreenData::canEdit,
         ByteBufCodecs.STRING_UTF8, GatewayScreenData::message,
         GatewayScreenData::new);

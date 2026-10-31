@@ -11,13 +11,13 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Client to server: a gateway block's new filter, from its dialog. Its owner's to change, or an op's. */
-public record GatewayFilter(BlockPos pos, boolean untagged, String vlans) implements CustomPacketPayload {
+/** Client to server: a gateway block's new VLANs and native VLAN, from its dialog. Its owner's to change, or an op's. */
+public record GatewayFilter(BlockPos pos, String vlans, String nativeVlan) implements CustomPacketPayload {
     public static final Type<GatewayFilter> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(Ccnix.ID, "gateway_filter"));
     public static final StreamCodec<RegistryFriendlyByteBuf, GatewayFilter> STREAM_CODEC = StreamCodec.composite(
         BlockPos.STREAM_CODEC, GatewayFilter::pos,
-        ByteBufCodecs.BOOL, GatewayFilter::untagged,
         ByteBufCodecs.STRING_UTF8, GatewayFilter::vlans,
+        ByteBufCodecs.STRING_UTF8, GatewayFilter::nativeVlan,
         GatewayFilter::new);
 
     @Override
@@ -33,9 +33,10 @@ public record GatewayFilter(BlockPos pos, boolean untagged, String vlans) implem
         }
         String message;
         if (!gateway.mayChange(player)) {
-            message = "Only its owner, or an op, can change this block's filter";
+            message = "Only its owner, or an op, can change this block's VLANs";
         } else {
-            var problem = gateway.filter(f.untagged(), f.vlans().length() > 200 ? f.vlans().substring(0, 200) : f.vlans());
+            var problem = gateway.filter(f.vlans().length() > 200 ? f.vlans().substring(0, 200) : f.vlans(),
+                f.nativeVlan().length() > 8 ? f.nativeVlan().substring(0, 8) : f.nativeVlan());
             message = problem == null ? "Saved" : problem;
         }
         gateway.openFor(player, message);

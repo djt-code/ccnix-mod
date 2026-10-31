@@ -20,6 +20,7 @@ class GatewayTest {
         long rank;
         final List<Gateway.Port> standbys = new ArrayList<>();
         java.util.function.IntPredicate filter = v -> true;
+        int nativeVlan = 1;
 
         @Override
         public void send(int channel, Map<String, Object> frame) {
@@ -45,6 +46,11 @@ class GatewayTest {
         @Override
         public boolean carries(int vlan) {
             return filter.test(vlan);
+        }
+
+        @Override
+        public int nativeVlan() {
+            return nativeVlan;
         }
     }
 
@@ -111,10 +117,12 @@ class GatewayTest {
     @Test
     void ignoresWhatIsntForIt() {
         g.fromCc(lan, CH, arpRequest("3:back", "10.0.0.2", "10.0.0.9"));
-        g.fromCc(lan, CH + 1, arpRequest("3:back.1", "10.0.0.2", "10.0.0.1"));
+        g.fromCc(lan, CH + 2, arpRequest("3:back.2", "10.0.0.2", "10.0.0.1"));
         g.fromCc(lan, CH, frame("3:back", "4:back", "ip", t()));
         assertEquals(0, lan.sent.size() + tun.size(), "not the gateway's: nothing answered, nothing into the TUN");
-        assertEquals(List.of(CH, CH + 1, CH), other.channels, "but carried across the exchange (and VLAN 1)");
+        assertEquals(List.of(CH, CH + 2, CH), other.channels, "but carried across the exchange (and VLAN 2)");
+        g.fromCc(lan, CH + 1, arpRequest("3:back.1", "10.0.0.2", "10.0.0.1"));
+        assertEquals(0, lan.sent.size(), "VLAN 1 tagged on a block whose native VLAN is 1: dropped");
         g.fromCc(lan, CH, frame("gateway", "*", "arp", t("op", "request", "sha", "gateway", "spa", ip("10.0.0.1"), "tpa", ip("10.0.0.1"))));
         g.fromCc(lan, CH, t("hello", "world"));
         g.fromCc(lan, CH, "rednet, say");
@@ -156,7 +164,10 @@ class GatewayTest {
         g.fromCc(lan, CH + 20, frame("3:back.20", "*", "arp", t()));
         g.fromCc(lan, CH + 101, frame("3:back.101", "*", "arp", t()));
         g.fromCc(lan, CH + 30, frame("3:back.30", "*", "arp", t()));
-        assertEquals(List.of(CH + 20, CH + 101), other.channels, "VLAN 30 isn't carried");
+        g.fromCc(lan, CH, frame("3:back", "*", "arp", t()));
+        assertEquals(List.of(CH + 20, CH + 101), other.channels, "VLAN 30 isn't carried, nor 1 (the exchange) here");
+        g.fromTun(udpTo("10.0.0.255"));
+        assertEquals(2, other.sent.size(), "the gateway is on VLAN 1: the server's list leaves it out");
         assertEquals("20, 100-102", Gateway.says(Gateway.vlans("20, 100-102", problems)));
         assertEquals("1-4094", Gateway.says(Gateway.vlans("1-4094", problems)));
         assertEquals("none", Gateway.says(Gateway.vlans("", problems)));
@@ -222,7 +233,7 @@ class GatewayTest {
     void eachBlocksOwnFilter() {
         var third = new Port();
         g.addPort(third);
-        other.filter = v -> v != 0 && v >= 20 && v <= 29;  // (a trunk: no exchange, VLANs 20-29)
+        other.filter = v -> v >= 20 && v <= 29;          // (a trunk: no exchange, VLANs 20-29)
         g.fromCc(lan, CH, frame("3:back", "*", "arp", t()));
         g.fromCc(lan, CH + 25, frame("3:back.25", "*", "arp", t()));
         g.fromCc(lan, CH + 30, frame("3:back.30", "*", "arp", t()));
@@ -239,13 +250,35 @@ class GatewayTest {
     }
 
     @Test
+    void nativeVlansAreUntaggedOnTheirCable() {
+        lan.nativeVlan = 10;                            // (its cable's plain computers are on VLAN 10)
+        g.fromCc(lan, CH, frame("3:back", "*", "arp", t()));
+        assertEquals(List.of(CH + 10), other.channels, "untagged on lan is VLAN 10: tagged on other");
+        g.fromCc(other, CH + 10, frame("4:back.10", "3:back", "ip", t()));
+        assertEquals(List.of(CH), lan.channels, "and back to lan untagged");
+        g.fromCc(lan, CH + 10, frame("5:back.10", "*", "arp", t()));
+        assertEquals(1, other.sent.size(), "VLAN 10 tagged on lan, its native: dropped");
+        g.fromCc(other, CH, arpRequest("4:back", "10.0.0.4", "10.0.0.9"));
+        assertEquals(List.of(CH, CH + 1), lan.channels, "the exchange (VLAN 1) reaches lan tagged: back.1");
+        g.fromCc(lan, CH + 1, arpRequest("3:back.1", "10.0.0.3", "10.0.0.1"));
+        assertEquals("3:back.1", lan.sent.get(2).get("dst"), "and the gateway answers back.1 there");
+        assertEquals(CH + 1, lan.channels.get(2));
+
+        lan.nativeVlan = 0;                             // (none: untagged frames are dropped)
+        g.fromCc(lan, CH, frame("3:back", "*", "arp", t()));
+        assertEquals(2, other.sent.size());
+        g.fromTun(udpTo("10.0.0.255"));
+        assertEquals(CH + 1, lan.channels.get(lan.channels.size() - 1), "VLAN 1 out of a block with none: tagged");
+    }
+
+    @Test
     void eachBlocksStatus() {
         g.fromCc(lan, CH, frame("3:back", "*", "arp", t()));
         g.fromCc(lan, CH + 20, frame("3:back.20", "*", "arp", t()));
         var lines = g.portStatus(lan);
         assertEquals("frames: 2 in, 0 out (0 from other blocks)", lines.get(0));
         assertEquals("2 MACs heard here: 3:back, 3:back.20 (VLAN 20)", lines.get(1));
-        assertEquals("VLANs seen here: 20", lines.get(2));
+        assertEquals("VLANs seen here: 1, 20", lines.get(2));
         assertEquals("the only block on its network", lines.get(3));
         assertEquals("frames: 0 in, 2 out (2 from other blocks)", g.portStatus(other).get(0));
         assertEquals(List.of("this block isn't on the gateway yet"), g.portStatus(new Port()));

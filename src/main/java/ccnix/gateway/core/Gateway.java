@@ -15,9 +15,12 @@ import java.util.function.LongSupplier;
  * The gateway between a CC network (lib/net's frames on one modem channel) and the server's TUN device, and the
  * exchange its blocks make.
  * <p>
- * The exchange: every gateway block is a port on one switch, so the CC networks behind all of them are one segment on
- * the gateway's channel (the untagged "routing exchange": 10.0.0.0/24, say, where routers peer), and one more for
- * each VLAN carried (channel + 1..4094, lib/net's "back.20"). A frame heard on one block goes to the block a MAC was
+ * The exchange: every gateway block is a port on one switch, as a switch's trunk ports are. Inside it every frame is
+ * on a VLAN, 1-4094; VLAN 1 is the "routing exchange" (10.0.0.0/24, say, where routers peer, and where the gateway
+ * itself is). On a block's cable a VLAN is a modem channel: its native VLAN (1 unless set; or none) untagged, on the
+ * gateway's channel, and every other VLAN tagged, on the channel + its number (lib/net's "back.20"), as a trunk port
+ * carries them. A tagged frame for the native VLAN is dropped, so each VLAN has one way on and off a cable. Each block
+ * passes only the VLANs in its own list, the server's list over all. A frame heard on one block goes to the block a MAC was
  * last heard on, or, for a broadcast or a MAC not yet heard, to every other block. One block per CC network: blocks
  * that hear each other's beacons ({@link Port#hello()}) share one, and all but the first (the lowest
  * {@link Port#rank()}) stand by, carrying nothing, until it goes (its chunk unloads, the cable is cut): a spare, not
@@ -55,9 +58,14 @@ public final class Gateway {
         default void standby(Port active) {
         }
 
-        /** Its own filter: whether it passes VLAN vlan (0: untagged, the exchange) either way; all by default. */
+        /** Its own list: whether it passes VLAN vlan (1-4094; 1 is the exchange) either way; all by default. */
         default boolean carries(int vlan) {
             return true;
+        }
+
+        /** The VLAN its cable's untagged frames are on (1 unless set; 0: none, untagged frames are dropped). */
+        default int nativeVlan() {
+            return 1;
         }
     }
 
@@ -126,7 +134,7 @@ public final class Gateway {
         }
     }
 
-    /** The VLANs the blocks carry between them, besides the exchange itself ({@link #vlans(String, List)}). */
+    /** The VLANs any block may carry (VLAN 1 is the exchange): the server's list ({@link #vlans(String, List)}). */
     public void configureVlans(BitSet carried) {
         vlans = (BitSet) carried.clone();
     }
@@ -228,49 +236,51 @@ public final class Gateway {
      */
     public void fromCc(Port port, int channel, Object payload) {
         var s = settings;
-        int vlan = channel - s.channel();
-        if (vlan < 0 || vlan > VLAN_MAX || vlan > 0 && !vlans.get(vlan)) return;
+        int tag = channel - s.channel();
+        if (tag < 0 || tag > VLAN_MAX) return;
         if (!(payload instanceof Map<?, ?> f) || seen(payload)) return;
         if (!(f.get("ccnet") instanceof Number n) || n.doubleValue() != 1) return;
         if (!(f.get("src") instanceof String src) || !(f.get("dst") instanceof String dst)) return;
         var stats = ports.get(port);
         if (stats == null || standby.containsKey(port) || src.equals(s.mac())) return;
-        if (!port.carries(vlan)) {
+        int vlan = tag == 0 ? port.nativeVlan() : tag == port.nativeVlan() ? 0 : tag;
+        if (vlan == 0 || !vlans.get(vlan) || !port.carries(vlan)) {
             stats.filtered++;
             return;
         }
         stats.in++;
-        if (vlan > 0) stats.vlans.set(vlan);
-        macs.put(channel + " " + src, new Learned(port, clock.getAsLong() + MAC_TTL));
-        boolean mine = vlan == 0 && dst.equals(s.mac());
-        if (!mine) relay(port, channel, f, dst);
-        if (vlan > 0 || !mine && !dst.equals(BROADCAST)) return;
+        stats.vlans.set(vlan);
+        macs.put(vlan + " " + src, new Learned(port, clock.getAsLong() + MAC_TTL));
+        boolean mine = vlan == 1 && dst.equals(s.mac());
+        if (!mine) relay(port, vlan, f, dst);
+        if (vlan != 1 || !mine && !dst.equals(BROADCAST)) return;
         Object type = f.get("type");
         if ("arp".equals(type)) arpIn(f.get("data"));
         else if ("ip".equals(type)) ipIn(mine, f.get("data"));
     }
 
     /** A frame from one block's network on to the others: where its MAC was heard, else to every other network. */
-    private void relay(Port from, int channel, Map<?, ?> frame, String dst) {
+    private void relay(Port from, int vlan, Map<?, ?> frame, String dst) {
         @SuppressWarnings("unchecked") var f = (Map<String, Object>) frame;
-        var to = dst.equals(BROADCAST) ? null : learned(channel, dst);
+        var to = dst.equals(BROADCAST) ? null : learned(vlan, dst);
         if (to != null) {
-            if (!together(to, from)) out(to, channel, f, true);
+            if (!together(to, from)) out(to, vlan, f, true);
             return;
         }
-        for (var p : onePerNetwork(from)) out(p, channel, f, true);
+        for (var p : onePerNetwork(from)) out(p, vlan, f, true);
     }
 
-    private Port learned(int channel, String mac) {
-        var l = macs.get(channel + " " + mac);
+    private Port learned(int vlan, String mac) {
+        var l = macs.get(vlan + " " + mac);
         return l == null || l.expires() <= clock.getAsLong() || !ports.containsKey(l.port()) || standby.containsKey(l.port())
             ? null : l.port();
     }
 
-    private void out(Port p, int channel, Map<String, Object> f, boolean relay) {
+    /** A frame on VLAN vlan out of block p: untagged if it's p's native VLAN, else tagged. */
+    private void out(Port p, int vlan, Map<String, Object> f, boolean relay) {
         var stats = ports.get(p);
         if (stats == null) return;
-        if (!p.carries(channel - settings.channel())) {
+        if (!vlans.get(vlan) || !p.carries(vlan)) {
             stats.filtered++;
             return;
         }
@@ -279,7 +289,7 @@ public final class Gateway {
             stats.relayed++;
             relayed++;
         }
-        p.send(channel, f);
+        p.send(settings.channel() + (vlan == p.nativeVlan() ? 0 : vlan), f);
     }
 
     private boolean seen(Object payload) {
@@ -399,11 +409,11 @@ public final class Gateway {
     private void send(String dstMac, String type, Object data) {
         var s = settings;
         var f = table("ccnet", 1, "dst", dstMac, "src", s.mac(), "type", type, "data", data);
-        var port = dstMac.equals(BROADCAST) ? null : learned(s.channel(), dstMac);
+        var port = dstMac.equals(BROADCAST) ? null : learned(1, dstMac);   // (the gateway is on VLAN 1, the exchange)
         if (port != null) {
-            out(port, s.channel(), f, false);
+            out(port, 1, f, false);
         } else {
-            for (var p : onePerNetwork(null)) out(p, s.channel(), f, false);
+            for (var p : onePerNetwork(null)) out(p, 1, f, false);
         }
     }
 
@@ -453,12 +463,11 @@ public final class Gateway {
         if (stats == null) return List.of("this block isn't on the gateway yet");
         long now = clock.getAsLong();
         var behind = new TreeSet<String>();
-        int base = settings.channel();
         macs.forEach((key, l) -> {
             if (l.port() != p || l.expires() <= now) return;
             int sp = key.indexOf(' ');
-            int vlan = Integer.parseInt(key.substring(0, sp)) - base;
-            behind.add(key.substring(sp + 1) + (vlan > 0 ? " (VLAN " + vlan + ")" : ""));
+            int vlan = Integer.parseInt(key.substring(0, sp));
+            behind.add(key.substring(sp + 1) + (vlan != 1 ? " (VLAN " + vlan + ")" : ""));
         });
         int sharing = 0;
         for (var q : ports.keySet()) if (q != p && together(p, q)) sharing++;

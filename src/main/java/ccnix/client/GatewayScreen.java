@@ -4,7 +4,6 @@ import ccnix.gateway.GatewayFilter;
 import ccnix.gateway.GatewayScreenData;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.Checkbox;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -16,16 +15,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A gateway block's dialog: what it carries and has heard, and its own filter (untagged, the exchange, and the VLANs
- * it passes), which its owner or an op may change.
+ * A gateway block's dialog: what it carries and has heard, and, as a switch's trunk port has, its VLANs and its native
+ * VLAN, which its owner or an op may change.
  */
 public final class GatewayScreen extends Screen {
-    private static final int WIDTH = 320, LINE = 10;
+    private static final int WIDTH = 320, LINE = 10, NATIVE_WIDTH = 60;
 
     private final GatewayScreenData data;
     private final List<FormattedCharSequence> text = new ArrayList<>();
-    private Checkbox untagged;
-    private EditBox vlans;
+    private EditBox vlans, nativeVlan;
     private int left, top, controls;
 
     GatewayScreen(GatewayScreenData data) {
@@ -40,18 +38,20 @@ public final class GatewayScreen extends Screen {
             text.addAll(font.split(FormattedText.of(line), WIDTH));
         }
         left = (width - WIDTH) / 2;
-        top = Math.max(8, (height - (24 + text.size() * LINE + 110)) / 2);
+        top = Math.max(8, (height - (24 + text.size() * LINE + 120)) / 2);
         controls = top + 24 + text.size() * LINE + 8;
 
-        untagged = addRenderableWidget(Checkbox.builder(Component.literal("Untagged: the exchange (the gateway's network)"), font)
-            .pos(left, controls).selected(data.untagged()).build());
-        vlans = addRenderableWidget(new EditBox(font, left, controls + 36, WIDTH, 18, Component.literal("VLANs")));
+        vlans = addRenderableWidget(new EditBox(font, left, controls + 12, WIDTH, 18, Component.literal("VLANs")));
         vlans.setMaxLength(200);
         vlans.setValue(data.vlans());
-        untagged.active = data.canEdit();
         vlans.setEditable(data.canEdit());
+        nativeVlan = addRenderableWidget(new EditBox(font, left + WIDTH - NATIVE_WIDTH, controls + 48, NATIVE_WIDTH, 18,
+            Component.literal("Native VLAN")));
+        nativeVlan.setMaxLength(8);
+        nativeVlan.setValue(data.nativeVlan());
+        nativeVlan.setEditable(data.canEdit());
 
-        int buttons = controls + 64;
+        int buttons = controls + 76;
         if (data.canEdit()) {
             addRenderableWidget(Button.builder(Component.literal("Save"), b -> save())
                 .bounds(left, buttons, WIDTH / 2 - 4, 20).build());
@@ -61,7 +61,7 @@ public final class GatewayScreen extends Screen {
     }
 
     private void save() {
-        PacketDistributor.sendToServer(new GatewayFilter(data.pos(), untagged.selected(), vlans.getValue().trim()));
+        PacketDistributor.sendToServer(new GatewayFilter(data.pos(), vlans.getValue().trim(), nativeVlan.getValue().trim()));
     }
 
     @Override
@@ -73,11 +73,13 @@ public final class GatewayScreen extends Screen {
             g.drawString(font, line, left, y, 0xC0C0C0);
             y += LINE;
         }
-        g.drawString(font, "VLANs it passes: \"1-4094\", \"10,20,100-199\", or empty for none", left, controls + 24, 0xA0A0A0);
+        g.drawString(font, "VLANs this block carries (1 is the exchange):", left, controls, 0xE0E0E0);
+        g.drawString(font, "\"1-4094\" all, \"2-4094\" a trunk without the exchange, \"1,10,20-29\"", left, controls + 33, 0xA0A0A0);
+        g.drawString(font, "Native (untagged) VLAN, a number or \"none\":", left, controls + 53, 0xE0E0E0);
         if (!data.canEdit()) {
-            g.drawString(font, "Only its owner, or an op, can change its filter", left, controls + 90, 0xA0A0A0);
+            g.drawString(font, "Only its owner, or an op, can change its VLANs", left, controls + 102, 0xA0A0A0);
         } else if (!data.message().isEmpty()) {
-            g.drawString(font, data.message(), left, controls + 90, data.message().equals("Saved") ? 0x80FF80 : 0xFF8080);
+            g.drawString(font, data.message(), left, controls + 102, data.message().equals("Saved") ? 0x80FF80 : 0xFF8080);
         }
     }
 

@@ -65,7 +65,7 @@ public final class Ccnix {
             if (e.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) e.accept(GATEWAY_ITEM);
         });
         bus.addListener(RomPack::addTo);
-        bus.addListener((RegisterPayloadHandlersEvent e) -> e.registrar("1")
+        bus.addListener((RegisterPayloadHandlersEvent e) -> e.registrar("2")
             .playToClient(GatewayScreenData.TYPE, GatewayScreenData.STREAM_CODEC, GatewayScreenData::handle)
             .playToServer(GatewayFilter.TYPE, GatewayFilter.STREAM_CODEC, GatewayFilter::handle));
         bus.addListener((ModConfigEvent.Reloading e) -> {
