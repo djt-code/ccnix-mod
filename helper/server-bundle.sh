@@ -44,7 +44,7 @@ cp "$jar" "$tmp/mods/"
 for d in config defaultconfigs; do [ -d "$inst/$d" ] && cp -r "$inst/$d" "$tmp/"; done
 # ccnix's config is the server's own (the playbook's, and its ops' routes and forwards):
 # the copy a singleplayer world left in the instance would replace it
-rm -f "$tmp/config/ccnix-server.toml"
+rm -f "$tmp/config/ccnix-server.toml" "$tmp"/config/ccnix-server-*.toml.bak   # (and NeoForge's backups of it)
 
 cc=$(ls "$tmp/mods" | grep -c '^cc-tweaked-' || true)
 [ "$cc" = 1 ] || { echo "$cc CC: Tweaked jars in the bundle: want exactly one, 1.120 or later" >&2; exit 1; }
