@@ -192,6 +192,35 @@
         ccnix_forwards:
           - { section: nat, key: forwards, value: "[{{ ccnix_nat_forwards | map('to_json') | join(', ') }}]" }
 
+    # CC: Tweaked's own config: computers' screens, [term_sizes.computer] only
+    # (pocket computers and monitors have their own).
+    - name: Is there a CC config?
+      ansible.builtin.stat:
+        path: "{{ minecraft_dir }}/config/computercraft-server.toml"
+      register: cc_config
+
+    - name: A CC config with the screen size, if there's none (CC fills in the rest)
+      ansible.builtin.copy:
+        content: "[term_sizes]\n\t[term_sizes.computer]\n\t\twidth = {{ ccnix_cc_term_width }}\n\t\theight = {{ ccnix_cc_term_height }}\n"
+        dest: "{{ minecraft_dir }}/config/computercraft-server.toml"
+        owner: "{{ minecraft_user }}"
+        mode: "0644"
+      when: not cc_config.stat.exists
+      notify: Restart minecraft
+
+    - name: Computers' screen size
+      ansible.builtin.replace:
+        path: "{{ minecraft_dir }}/config/computercraft-server.toml"
+        regexp: '(\[term_sizes\.computer\][^\[]*?\b{{ item.key }}\s*=\s*)\d+'
+        replace: '\g<1>{{ item.value }}'
+      loop:
+        - { key: width, value: "{{ ccnix_cc_term_width }}" }
+        - { key: height, value: "{{ ccnix_cc_term_height }}" }
+      loop_control:
+        label: "{{ item.key }} {{ item.value }}"
+      when: cc_config.stat.exists
+      notify: Restart minecraft
+
     - name: eula.txt
       ansible.builtin.copy:
         content: "eula=true\n"

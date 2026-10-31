@@ -82,6 +82,10 @@ VLANs carried between blocks besides the untagged one, and
 `ccnix_gateway_max_per_player` (5; 0 for any number) how many blocks one
 player may have placed.
 
+Computers' screens: `ccnix_cc_term_width` and `ccnix_cc_term_height` (80
+and 24; CC's own default is 51x19) set `[term_sizes.computer]` in CC:
+Tweaked's `config/computercraft-server.toml`, whatever the bundle brought.
+
 **NAT mode's settings** (`[nat]`), all the admin's:
 
 | Variable | Default | |

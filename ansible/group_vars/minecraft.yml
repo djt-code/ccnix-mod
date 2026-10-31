@@ -57,6 +57,11 @@ ccnix_ansible_routes: false
 ccnix_gateway_vlans: "1-4094"
 ccnix_gateway_max_per_player: 5
 
+# CC: Tweaked's computers' screens, in characters (CC's own default is
+# 51x19; 80x24 fits telnet and ANSI programs, at GUI scale 3 on 1080p).
+ccnix_cc_term_width: 80
+ccnix_cc_term_height: 24
+
 # NAT mode ([nat]).  The policy and limits apply only to CC computers'
 # connections through a Network Gateway, never to the server's or players'.
 ccnix_nat_deny: ["0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16",
