@@ -109,7 +109,7 @@ public final class Config {
 
     public static final ModConfigSpec.BooleanValue OP_FORWARDS = BUILDER
         .comment("Ops may change the forwards in game (/ccnix forward add|del, permission level 3), on opForwardPorts only.",
-            "Always allowed in singleplayer, whatever this says, and on any port there unless opForwardPorts names some.")
+            "Always allowed in singleplayer, whatever this says, there on 25600-26623 unless opForwardPorts names others.")
         .define("opForwards", false);
 
     public static final ModConfigSpec.ConfigValue<String> OP_FORWARD_PORTS = BUILDER

@@ -98,8 +98,9 @@ own (Java sockets), carried byte for byte, and the gateway answers ping at its a
 - **Port forwards:** `forwards = ["25570/tcp -> 10.1.1.10:23"]` listens on the server's port and connects to the CC
   computer, which sees the client's real address (a client on the server's own loopback shows as the gateway's). UDP
   too. With `opForwards`, ops change them in game, on the ports in `opForwardPorts` only (`"25570-25579"`: the
-  ones the host gave the server). In singleplayer, where the player is the admin, ops may always, on any port
-  unless `opForwardPorts` names some (op routes too, whatever `opRoutes` says):
+  ones the host gave the server; empty, none). In singleplayer, where the player is the admin, ops may always, on
+  25600-26623 (1024 ports just above Minecraft's own) unless `opForwardPorts` names others; op routes too, whatever
+  `opRoutes` says:
 
   ```
   /ccnix forward                                 the forwards, and the ports ops may use

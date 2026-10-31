@@ -40,7 +40,7 @@ import static net.minecraft.commands.Commands.literal;
  *   /ccnix route del &lt;net/len&gt;
  *   /ccnix forward                          the port forwards, and the ports ops may forward
  *   /ccnix forward add &lt;port&gt;[/udp] &lt;a.b.c.d&gt;:&lt;port&gt;   (NAT mode, nat.opForwards, on nat.opForwardPorts;
- *                                           in singleplayer always, on any port unless opForwardPorts says)
+ *                                           in singleplayer always, on 25600-26623 unless opForwardPorts says)
  *   /ccnix forward del &lt;port&gt;[/udp]
  *   /ccnix rom update                       git pull (or clone) ccnix-rom/ in the server's folder, then reload
  * </pre>
@@ -190,10 +190,16 @@ final class CcnixCommand {
         return Config.OP_FORWARDS.get() || !src.getServer().isDedicatedServer();
     }
 
-    /** nat.opForwardPorts; in singleplayer with none set, any port. */
+    /**
+     * Singleplayer's ports for ops' forwards when opForwardPorts names none: 1024 just above Minecraft's own (the
+     * game's 25565, RCON's 25575). A server has none unless its admin sets them.
+     */
+    static final int[] SINGLEPLAYER_PORTS = {25600, 26623};
+
+    /** nat.opForwardPorts; in singleplayer with none set, {@link #SINGLEPLAYER_PORTS}. */
     private static int[] opRange(CommandSourceStack src) {
         var range = OpForwards.range(Config.OP_FORWARD_PORTS.get());
-        return range == null && !src.getServer().isDedicatedServer() ? new int[] {1, 65535} : range;
+        return range == null && !src.getServer().isDedicatedServer() ? SINGLEPLAYER_PORTS : range;
     }
 
     private static List<String> forwards(CommandSourceStack src) {
