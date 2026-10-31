@@ -284,6 +284,11 @@
       register: ufw
       changed_when: "'Skipping' not in ufw.stdout"
 
+    # (a restart the changes above asked for happens here, so the server
+    # isn't started below and then restarted again at the end)
+    - name: Restart what changed
+      ansible.builtin.meta: flush_handlers
+
     - name: The server, now and at every boot
       ansible.builtin.systemd_service:
         name: minecraft
