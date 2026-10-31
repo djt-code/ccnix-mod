@@ -124,7 +124,7 @@ public final class Ipv4 {
             if ("unreachable".equals(type)) {
                 s[0] = 3;
                 Object code = d.get("code");
-                s[1] = (byte) ("net".equals(code) ? 0 : "port".equals(code) ? 3 : 1);
+                s[1] = (byte) ("net".equals(code) ? 0 : "port".equals(code) ? 3 : "prohibited".equals(code) ? 13 : 1);
             } else {
                 s[0] = 11;
             }
@@ -234,7 +234,8 @@ public final class Ipv4 {
             case 3, 11 -> {
                 String name;
                 if (type == 11) name = "ttl";
-                else if (code == 0 || code == 5 || code == 6 || code == 9 || code == 11) name = "net";
+                else if (code == 9 || code == 10 || code == 13) name = "prohibited";   // (administratively: a filter)
+                else if (code == 0 || code == 5 || code == 6 || code == 11) name = "net";
                 else if (code == 2 || code == 3) name = "port";
                 else if (code == 4) return null;        // (fragmentation needed: CC's packets are small)
                 else name = "host";

@@ -320,4 +320,4 @@ Windows `route add 10.0.0.0 mask 255.0.0.0 <vm address>`; then `telnet
 | R: `router` | each interface's frames, routes, forwarded/dropped, "no ARP answer" and such |
 | a host: `ip`, `ip neigh` | what's set, whether it's up, who ARP has found |
 | VM: `ip -br addr show ccnix0`, `ip route`, `tcpdump -ni ccnix0` | the device, the routes into it, the packets actually crossing |
-| `ping` says | "net unreachable": a router lacks a route; "host unreachable": no ARP answer (address wrong, or not up); "time to live exceeded": a routing loop |
+| `ping` says | "net unreachable": a router lacks a route; "administratively prohibited": a filter, or a NAT-mode gateway (no ping past it); "host unreachable": no ARP answer (address wrong, or not up); "time to live exceeded": a routing loop |

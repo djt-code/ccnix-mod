@@ -154,6 +154,19 @@ class Ipv4Test {
     }
 
     @Test
+    void prohibitedBothWays() {
+        var orig = t("src", B, "dst", Ipv4.parseIp("192.168.1.50") * 1.0, "proto", "udp", "sport", 5000, "dport", 53);
+        var p = Ipv4.fromCc(ip("icmp", t("type", "unreachable", "code", "prohibited", "orig", orig)));
+        assertEquals(13, u8(p, 21), "communication administratively prohibited (RFC 1812)");
+        assertTrue(checksumsOk(p));
+        for (int code : new int[] {9, 10, 13}) {
+            p[21] = (byte) code;
+            @SuppressWarnings("unchecked") var d = (Map<String, Object>) Ipv4.toCc(p).get("data");
+            assertEquals("prohibited", d.get("code"), "code " + code);
+        }
+    }
+
+    @Test
     void timeExceededFromARealRouter() {
         var probe = Packets.udp("10.0.0.5", 33434, "8.8.8.8", 33435, new byte[12]);
         var inner = new byte[28];

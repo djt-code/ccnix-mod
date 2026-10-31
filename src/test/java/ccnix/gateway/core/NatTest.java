@@ -139,9 +139,9 @@ class NatTest {
         assertEquals("reply 10.0.0.1", w.luaString("local e = H.find('net_icmp', 1)[1]; return e[2] .. ' ' .. e[3]"));
         assertEquals("reply 10.1.0.6", w.luaString("local e = H.find('net_icmp', 1)[2]; return e[2] .. ' ' .. e[3]"),
             "A to B: through the gateway (Nat passes it back), then R");
-        assertEquals("unreachable 10.0.0.1 net 3", w.luaString(
+        assertEquals("unreachable 10.0.0.1 prohibited 3", w.luaString(
             "local e = H.find('net_icmp', 2)[1]; return e[2] .. ' ' .. e[3] .. ' ' .. e[4] .. ' ' .. e[5].seq"),
-            "no ICMP to the outside: the gateway says so");
+            "no ICMP to the outside: the gateway says so (administratively prohibited)");
     }
 
     @Test
@@ -214,9 +214,9 @@ class NatTest {
             "a private address, and port 25 anywhere: refused at once");
         w.lua("p = B.udpOpen(); B.udpSend(p, '169.254.169.254', 80, 'x')");
         w.pump(0.2);
-        assertEquals("unreachable port 169.254.169.254", w.luaString(
+        assertEquals("unreachable prohibited 169.254.169.254", w.luaString(
             "local e = H.find('net_icmp', 2)[1]; return e[2] .. ' ' .. e[4] .. ' ' .. N.ipString(e[5].dst)"),
-            "the cloud metadata service: port unreachable");
+            "the cloud metadata service: administratively prohibited");
         long before = w.nat.refused;
         w.lua("for port = 1001, 1003 do B.udpSend(p, '" + FAR + "', port, 'x') end");
         w.pump(0.2);

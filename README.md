@@ -73,7 +73,7 @@ The gateway joins CC's wired network to the real one, in one of two modes, the s
 |---|---|---|
 | Runs | in the server process: no privileges, helper or setup; any OS, a container, singleplayer | through a TUN device on a Linux server, set up as root |
 | CC to the outside | TCP and UDP, as the server's own connections | routed, with real addresses (`FORWARD`, `NAT` on the host) |
-| ping, traceroute past the gateway | no: the gateway says "net unreachable" | yes |
+| ping, traceroute past the gateway | no: the gateway says "administratively prohibited" | yes |
 | The outside to CC | only through port forwards (`nat.forwards`, ops' if allowed) | routed, as the host's routing and firewall allow |
 | Protection | a deny list and limits for CC computers' connections, on by default | the host's firewall |
 | DNS at the gateway's address | relayed to the server's resolver (on Windows, answered from it) | whatever the host serves there |
@@ -90,7 +90,7 @@ own (Java sockets), carried byte for byte, and the gateway answers ping at its a
   players'): `deny` blocks private, loopback, link-local (the cloud metadata service), carrier-grade NAT,
   multicast and reserved addresses, and port 25 anywhere; `allow` makes exceptions; `maxPerComputer` (16) and
   `maxTotal` (256) cap open connections and flows; `tcpIdle` (600 s) and `udpIdle` (60 s) close quiet ones. A
-  refused TCP connection gets a reset, a refused datagram "port unreachable".
+  refused TCP connection gets a reset, a refused datagram "administratively prohibited".
 - **DNS:** `dnsRelay = "system"` relays port 53 at the gateway's address, unread, to the first `nameserver` in
   `/etc/resolv.conf`, so `ip dns 10.0.0.1` works on a host that blocks outbound DNS. On Windows, which has no such
   file, the gateway answers A and PTR questions from the Windows resolver instead. An address relays there; `""`
@@ -284,5 +284,5 @@ clone. With the submodule not checked out, the build uses the ccnix repo this is
 - **No DHCP:** routers' addresses are set by hand.
 - **No ICMP errors from the gateway itself in TUN mode.** A packet it can't deliver is just dropped. The gateway
   shares the server's address, and the server would refuse an ICMP from its own address. (NAT mode sends its own:
-  net and port unreachable, time exceeded.)
+  administratively prohibited, port unreachable, time exceeded.)
 - **IPv4 only**, and one gateway per server.

@@ -15,8 +15,9 @@ import java.util.function.LongSupplier;
  * NAT mode (ADR-0002): the gateway's other side as a userspace kernel, in place of a TUN device, needing no
  * privileges. It's transport only: CC's TCP connections and UDP flows to the outside are carried as the server's own
  * sockets ({@link Outside}), their bytes passed through unread. Besides that it answers ping at the gateway's address,
- * passes packets between CC networks back to the gateway (as the server's kernel does in TUN mode), says "net
- * unreachable" for an echo to the outside (it can't send ICMP there), relays port 53 at the gateway's address to the
+ * passes packets between CC networks back to the gateway (as the server's kernel does in TUN mode), says
+ * "administratively prohibited" for an echo to the outside (it can't send ICMP there) and for a datagram the policy
+ * refuses, relays port 53 at the gateway's address to the
  * server's resolver (or on Windows answers it: the one exception), and carries port forwards in from outside.
  * <p>
  * The outbound policy and limits ({@link NatConfig}) apply to CC computers' connections through it, nothing else.
@@ -157,7 +158,7 @@ public final class Nat implements Gateway.Tun {
         } else if ("udp".equals(proto)) {
             udpOut(src, dst, d);
         } else if ("echo".equals(d.get("type"))) {
-            icmpError(m, "unreachable", "net");         // (no ICMP to the outside: say where it stops)
+            icmpError(m, "unreachable", "prohibited");  // (no ICMP to the outside: say where it stops, and why)
         }
     }
 
@@ -323,7 +324,7 @@ public final class Nat implements Gateway.Tun {
             boolean relay = dst == gw.ip();
             long to = relay ? cfg.dns().resolver() : dst;
             if (!admit(src, relay, to, dport)) {
-                portUnreachable(src, dst, d);
+                udpError(src, dst, d, "prohibited");
                 return;
             }
             Outside.Udp sock;
@@ -364,12 +365,17 @@ public final class Nat implements Gateway.Tun {
     }
 
     private void portUnreachable(long ccIp, long myIp, Map<String, Object> d) {
+        udpError(ccIp, myIp, d, "port");
+    }
+
+    /** "Destination unreachable", code ("port", "prohibited"), about a datagram from ccIp to myIp. */
+    private void udpError(long ccIp, long myIp, Map<String, Object> d, String code) {
         Map<String, Object> m = new HashMap<>();
         m.put("src", ccIp);
         m.put("dst", myIp);
         m.put("proto", "udp");
         m.put("data", d);
-        icmpError(m, "unreachable", "port");
+        icmpError(m, "unreachable", code);
     }
 
     // ---------------------------------------------------------------------------------------------------------------
