@@ -81,6 +81,22 @@ The gateway joins CC's wired network to the real one, in one of two modes, the s
 Either way the gateway is transport only: it carries IP, TCP and UDP and never reads what's inside (the Windows DNS
 answer is the one exception). Programs on the computers do everything above that.
 
+### The exchange
+
+Every gateway block, wherever it is, joins one exchange: a switch whose ports are the blocks. The CC networks behind
+all of them are one network on the gateway's untagged channel (10.0.0.0/24: routers on different blocks reach each
+other at their addresses there, and the gateway is one host on it), and one more for each VLAN carried
+(`gateway.vlans`, all by default: a router's `back.20` on one block reaches `back.20` on another). A frame goes to the
+block its MAC was last heard on, a broadcast to all of them.
+
+- **One block per cable network.** Blocks on the same cable network hear each other's beacons (on a channel no modem
+  opens); the first placed works and the others stand by, carrying nothing, until it goes (broken, or its chunk
+  unloaded): a spare, not a loop. Its owner is told once, and its right-click says so.
+- **IDs and owners.** Each block gets an ID when placed, and remembers who placed it. A player may have
+  `gateway.maxPerPlayer` (5) placed; `/ccnix gateways` lists them all.
+- **Right-click** one with an empty hand for its stats: its ID and owner, frames in and out, the MACs heard behind it,
+  the VLANs seen, whether it stands by.
+
 ### NAT mode
 
 Nothing to set up: place a gateway and route at it. CC computers' connections to the outside become the server's
@@ -201,6 +217,8 @@ it, end to end.
    | `gateway.routes` | `[]` | Networks behind CC routers: `["10.1.0.0/16 via 10.0.0.2"]`. The longest match wins. |
    | `gateway.opRoutes` | `false` | Ops may change the routes in game (`/ccnix route add\|del`). Always on in singleplayer, where the player is the admin. |
    | `gateway.opMaxSubnet` | `16` | The largest network an op may route, as a prefix length: 16 allows a /16 or smaller. |
+   | `gateway.vlans` | `1-4094` | The VLANs the blocks carry between them, besides the untagged exchange (`"10,20,100-199"`; `""` none). |
+   | `gateway.maxPerPlayer` | `5` | How many gateway blocks one player may have placed (0: any number). |
    | `nat.*` | | NAT mode: `deny`, `allow`, `maxPerComputer`, `maxTotal`, `tcpIdle`, `udpIdle`, `dnsRelay`, `forwards`, `opForwards`, `opForwardPorts` (above). |
    | `tun.helper` | `ccnix-tun` | The helper, with any arguments before the device's name. |
    | `tun.device` | `ccnix0` | The TUN device. |
@@ -243,6 +261,10 @@ router boot
 Hosts behind it route at it (`ip route add default via 10.1.0.1`). The gateway needs a route back:
 `routes = ["10.1.0.0/16 via 10.0.0.2"]`. A host can also sit on the gateway's network itself, with
 `ip route add default via 10.0.0.1`.
+
+A router on another block's cable is on the same exchange: give it `10.0.0.3/24` and its own network, and the
+routers can reach each other directly (`ip route add 10.1.3.0/24 via 10.0.0.3` on the first) as well as through the
+gateway's routes.
 
 In TUN mode, `telnet 10.1.0.6` from the server reaches a CC computer running `telnetd`. Other machines reach CC's
 networks in one of two ways:

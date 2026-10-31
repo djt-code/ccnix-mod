@@ -7,7 +7,9 @@ import ccnix.gateway.core.OpRoutes;
 import ccnix.gateway.core.Settings;
 import ccnix.rom.Rom;
 import ccnix.rom.RomPack;
+import ccnix.gateway.GatewayRegistry;
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.logging.LogUtils;
 import net.minecraft.commands.CommandSourceStack;
@@ -42,6 +44,8 @@ import static net.minecraft.commands.Commands.literal;
  *   /ccnix forward add &lt;port&gt;[/udp] &lt;a.b.c.d&gt;:&lt;port&gt;   (NAT mode, nat.opForwards, on nat.opForwardPorts;
  *                                           in singleplayer always, on 25600-26623 unless opForwardPorts says)
  *   /ccnix forward del &lt;port&gt;[/udp]
+ *   /ccnix gateways                         the gateway blocks: IDs, owners, where
+ *   /ccnix gateways forget &lt;id&gt;             one that's gone without being broken: no longer counted
  *   /ccnix rom update                       git pull (or clone) ccnix-rom/ in the server's folder, then reload
  * </pre>
  * Route and forward changes are saved in config/ccnix-server.toml and apply at once. The mode is the server admin's,
@@ -69,9 +73,41 @@ final class CcnixCommand {
                     .then(argument("forward", greedyString()).executes(ctx -> addForward(ctx.getSource(), getString(ctx, "forward")))))
                 .then(literal("del").requires(s -> s.hasPermission(OPS))
                     .then(argument("port", greedyString()).executes(ctx -> delForward(ctx.getSource(), getString(ctx, "port"))))))
+            .then(literal("gateways")
+                .executes(ctx -> say(ctx, gateways(ctx.getSource())))
+                .then(literal("forget").requires(s -> s.hasPermission(OPS))
+                    .then(argument("id", IntegerArgumentType.integer(1))
+                        .executes(ctx -> forgetGateway(ctx.getSource(), IntegerArgumentType.getInteger(ctx, "id"))))))
             .then(literal("rom")
                 .executes(ctx -> say(ctx, romStatus()))
                 .then(literal("update").requires(s -> s.hasPermission(OPS)).executes(ctx -> updateRom(ctx.getSource())))));
+    }
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // Gateway blocks
+    // ---------------------------------------------------------------------------------------------------------------
+
+    private static List<String> gateways(CommandSourceStack src) {
+        var all = GatewayRegistry.get(src.getServer()).all();
+        int max = Config.MAX_PER_PLAYER.get();
+        var out = new ArrayList<String>();
+        out.add(all.size() + (all.size() == 1 ? " gateway block" : " gateway blocks") + "; "
+            + (max > 0 ? max + " each at most (gateway.maxPerPlayer)" : "no limit each"));
+        for (var e : all) {
+            out.add("  #" + e.id() + " " + (e.owner() == null ? "(no owner)" : e.ownerName()) + ", " + e.where());
+        }
+        return out;
+    }
+
+    /** One the registry has but the world doesn't (lost some other way than breaking it): no longer counted. */
+    private static int forgetGateway(CommandSourceStack src, int id) {
+        var r = GatewayRegistry.get(src.getServer());
+        var e = r.get(id);
+        if (e == null || !r.remove(id)) return fail(src, "No gateway block #" + id);
+        LOG.info("ccnix: {} forgot gateway block #{} ({})", src.getTextName(), id, e.where());
+        src.sendSuccess(() -> Component.literal("Forgot gateway block #" + id + " (" + e.where() + "); if it's still"
+            + " there it comes back when its chunk loads"), true);
+        return 1;
     }
 
     private static int say(CommandContext<CommandSourceStack> ctx, List<String> lines) {

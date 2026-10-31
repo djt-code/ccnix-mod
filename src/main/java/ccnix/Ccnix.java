@@ -2,12 +2,14 @@ package ccnix;
 
 import ccnix.gateway.GatewayBlock;
 import ccnix.gateway.GatewayBlockEntity;
+import ccnix.gateway.GatewayItem;
 import ccnix.gateway.Service;
 import ccnix.rom.RomPack;
 import dan200.computercraft.api.network.wired.WiredElementCapability;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
@@ -43,7 +45,8 @@ public final class Ccnix {
 
     public static final DeferredBlock<GatewayBlock> GATEWAY = BLOCKS.register("gateway", () -> new GatewayBlock(
         BlockBehaviour.Properties.of().mapColor(MapColor.STONE).strength(1.5f).sound(SoundType.STONE)));
-    public static final DeferredItem<BlockItem> GATEWAY_ITEM = ITEMS.registerSimpleBlockItem(GATEWAY);
+    public static final DeferredItem<BlockItem> GATEWAY_ITEM = ITEMS.register("gateway",
+        () -> new GatewayItem(GATEWAY.get(), new Item.Properties()));
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<GatewayBlockEntity>> GATEWAY_ENTITY =
         BLOCK_ENTITIES.register("gateway", () -> BlockEntityType.Builder.of(GatewayBlockEntity::new, GATEWAY.get()).build(null));
 

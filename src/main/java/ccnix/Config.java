@@ -62,6 +62,16 @@ public final class Config {
         .comment("The largest network an op may route, as a prefix length: 16 lets an op route a /16 or anything smaller.")
         .defineInRange("opMaxSubnet", 16, 1, 32);
 
+    public static final ModConfigSpec.ConfigValue<String> VLANS = BUILDER
+        .comment("Every gateway block joins one exchange: the untagged channel above (the gateway's network, where CC",
+            "routers peer) and these VLANs (lib/net's \"back.20\": channel + 20), carried between the blocks.",
+            "\"1-4094\", \"10,20,100-199\", or \"\" for the untagged exchange alone.")
+        .define("vlans", "1-4094");
+
+    public static final ModConfigSpec.IntValue MAX_PER_PLAYER = BUILDER
+        .comment("How many gateway blocks one player may have placed (0: any number).")
+        .defineInRange("maxPerPlayer", 5, 0, 1024);
+
     static {
         BUILDER.pop().comment("NAT mode. The limits and lists here apply only to CC computers' connections through a",
             "Network Gateway, never to the server's own connections or its players'.").push("nat");

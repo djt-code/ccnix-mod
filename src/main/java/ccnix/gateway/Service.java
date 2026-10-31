@@ -68,6 +68,8 @@ public final class Service {
                 if (t != null) t.write(packet);
             }, clock);
         }
+        var carried = vlans();
+        run(g -> g.configureVlans(carried));
         for (var p : PORTS) run(g -> g.addPort(p));
         exec.scheduleAtFixedRate(() -> run(Gateway::tick), 250, 250, TimeUnit.MILLISECONDS);
         if (!PORTS.isEmpty() && mode.equals("tun")) startTun();
@@ -104,6 +106,8 @@ public final class Service {
         var s = settings();
         channel = s.channel();
         run(g -> g.configure(s));
+        var carried = vlans();
+        run(g -> g.configureVlans(carried));
         var n = nat;
         if (n != null) {
             var c = natConfig();
@@ -169,6 +173,14 @@ public final class Service {
         return NatConfig.Dns.OFF;
     }
 
+    /** The VLANs the config says the blocks carry. */
+    static java.util.BitSet vlans() {
+        var problems = new ArrayList<String>();
+        var v = Gateway.vlans(Config.VLANS.get(), problems);
+        for (var p : problems) LOG.warn("ccnix config: gateway.vlans: {}", p);
+        return v;
+    }
+
     /** The settings the config gives (what can't be used is logged and left out). */
     public static Settings settings() {
         var problems = new ArrayList<String>();
@@ -217,7 +229,12 @@ public final class Service {
         run(g -> g.removePort(p));
     }
 
-    /** The channel the gateway listens on (-1: not running): a block passes on only what's on it. */
+    /** Block a heard block b's beacon. */
+    static void heard(Gateway.Port a, Gateway.Port b) {
+        run(g -> g.heard(a, b));
+    }
+
+    /** The channel the gateway listens on (-1: not running): a block passes on only what's on it and its VLANs'. */
     static int channel() {
         return channel;
     }
@@ -247,6 +264,27 @@ public final class Service {
             out.add("the gateway didn't answer: " + ex);
         }
         if (mode.equals("tun")) out.add("TUN helper: " + (t == null ? "not started (no gateway block loaded)" : t.state()));
+        return out;
+    }
+
+    /** One block's part, for its right-click: the gateway, then the block. */
+    static List<String> portStatus(Gateway.Port p) {
+        ScheduledExecutorService e;
+        Gateway g;
+        synchronized (Service.class) {
+            e = exec;
+            g = gateway;
+        }
+        if (e == null || g == null) return List.of("the gateway isn't running");
+        var s = settings();
+        var out = new ArrayList<String>();
+        out.add("on the exchange: the gateway is " + s.address() + " (" + mode + " mode), channel " + s.channel()
+            + "; VLANs carried: " + Gateway.says(vlans()));
+        try {
+            out.addAll(e.submit(() -> g.portStatus(p)).get(2, TimeUnit.SECONDS));
+        } catch (Exception ex) {
+            out.add("the gateway didn't answer: " + ex);
+        }
         return out;
     }
 

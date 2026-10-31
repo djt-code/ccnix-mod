@@ -1,16 +1,27 @@
 package ccnix.gateway.core;
 
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.LongSupplier;
 
 /**
- * The gateway between a CC network (lib/net's frames on one modem channel) and the server's TUN device.
+ * The gateway between a CC network (lib/net's frames on one modem channel) and the server's TUN device, and the
+ * exchange its blocks make.
+ * <p>
+ * The exchange: every gateway block is a port on one switch, so the CC networks behind all of them are one segment on
+ * the gateway's channel (the untagged "routing exchange": 10.0.0.0/24, say, where routers peer), and one more for
+ * each VLAN carried (channel + 1..4094, lib/net's "back.20"). A frame heard on one block goes to the block a MAC was
+ * last heard on, or, for a broadcast or a MAC not yet heard, to every other block. One block per CC network: blocks
+ * that hear each other's beacons ({@link Port#hello()}) share one, and all but the first (the lowest
+ * {@link Port#rank()}) stand by, carrying nothing, until it goes (its chunk unloads, the cable is cut): a spare, not
+ * a loop. The gateway itself is a host on the exchange.
  * <p>
  * It is the link layer for the server, which is the router: CC hosts and routers send packets for the outside to
  * the gateway's address (it answers ARP for it), and each goes into the TUN device as IPv4; the server delivers or
@@ -19,19 +30,30 @@ import java.util.function.LongSupplier;
  * dropped if no answer comes). The server's own address on the TUN device should be the gateway's address, so
  * packets for it reach the server itself.
  * <p>
- * Ports are the gateway's blocks: one CC network each (several can share one). A frame for a MAC goes out of the
- * port it was last heard on; a broadcast goes out of every port.
- * <p>
  * Not thread-safe: the mod calls it from one thread.
  */
 public final class Gateway {
     public static final String BROADCAST = "*";
-    static final long ARP_TTL = 300_000, ARP_RETRY = 1_000;
-    static final int ARP_TRIES = 3, QUEUE_MAX = 32, RECENT = 32;
+    public static final int VLAN_MAX = 4094;
+    static final long ARP_TTL = 300_000, ARP_RETRY = 1_000, MAC_TTL = 300_000, HELLO_EVERY = 2_000, PEER_TTL = 7_000;
+    static final int ARP_TRIES = 3, QUEUE_MAX = 32, RECENT = 64;
 
     /** A block: sends frames into its CC network. */
     public interface Port {
         void send(int channel, Map<String, Object> frame);
+
+        /** A beacon the blocks on the same CC network hear ({@link #heard}); none by default. */
+        default void hello() {
+        }
+
+        /** Of the blocks on one CC network, the lowest works and the rest stand by. */
+        default long rank() {
+            return 0;
+        }
+
+        /** It stands by now (for active, on its network), or works again (active null). */
+        default void standby(Port active) {
+        }
     }
 
     /** The TUN device. */
@@ -40,6 +62,15 @@ public final class Gateway {
     }
 
     private record Neighbour(String mac, long expires) {
+    }
+
+    private record Learned(Port port, long expires) {
+    }
+
+    /** One block's counts. */
+    private static final class Stats {
+        long in, out, relayed;
+        final BitSet vlans = new BitSet();
     }
 
     private static final class Waiting {
@@ -56,15 +87,21 @@ public final class Gateway {
     private final Tun tun;
     private final LongSupplier clock;
     private Settings settings;
-    private final Set<Port> ports = new LinkedHashSet<>();
+    private BitSet vlans = vlans("1-" + VLAN_MAX, new ArrayList<>());
+    private final Map<Port, Stats> ports = new LinkedHashMap<>();
+    private final Map<Port, Map<Port, Long>> peers = new IdentityHashMap<>();
+    private final Map<Port, Port> standby = new IdentityHashMap<>();
     private final Map<Long, Neighbour> arp = new HashMap<>();
     private final Map<Long, Waiting> waiting = new HashMap<>();
-    private final Map<String, Port> heardOn = new HashMap<>();
+    private final Map<String, Learned> macs = new HashMap<>();
     private final Object[] recent = new Object[RECENT];
     private int recentNext;
+    private long nextHello;
 
     /** Packets from CC into the TUN device, from it into CC, dropped (unreadable, no route, no ARP answer). */
     public long toTun, toCc, dropped, arpAsked;
+    /** Frames passed between blocks on the exchange and its VLANs. */
+    public long relayed;
 
     /** clock: milliseconds. */
     public Gateway(Settings settings, Tun tun, LongSupplier clock) {
@@ -80,36 +117,156 @@ public final class Gateway {
         if (old.ip() != s.ip() || old.prefix() != s.prefix() || !old.mac().equals(s.mac()) || old.channel() != s.channel()) {
             arp.clear();
             waiting.clear();
-            heardOn.clear();
+            macs.clear();
         }
     }
 
+    /** The VLANs the blocks carry between them, besides the exchange itself ({@link #vlans(String, List)}). */
+    public void configureVlans(BitSet carried) {
+        vlans = (BitSet) carried.clone();
+    }
+
+    /** "1-4094", "10,20,100-199" or "" (none) as a set of VLANs; what can't be used is said in problems. */
+    public static BitSet vlans(String spec, List<String> problems) {
+        var set = new BitSet();
+        if (spec == null || spec.isBlank()) return set;
+        for (var part : spec.split(",")) {
+            var p = part.trim();
+            int dash = p.indexOf('-');
+            try {
+                int lo = Integer.parseInt((dash < 0 ? p : p.substring(0, dash)).trim());
+                int hi = dash < 0 ? lo : Integer.parseInt(p.substring(dash + 1).trim());
+                if (lo < 1 || hi > VLAN_MAX || lo > hi) throw new NumberFormatException();
+                set.set(lo, hi + 1);
+            } catch (NumberFormatException e) {
+                problems.add("VLANs \"" + p + "\" isn't n or lo-hi within 1-" + VLAN_MAX + ": left out");
+            }
+        }
+        return set;
+    }
+
     public void addPort(Port p) {
-        ports.add(p);
+        ports.putIfAbsent(p, new Stats());
     }
 
     public void removePort(Port p) {
         ports.remove(p);
-        heardOn.values().removeIf(q -> q == p);
+        peers.remove(p);
+        standby.remove(p);
+        for (var m : peers.values()) m.remove(p);
+        macs.values().removeIf(l -> l.port() == p);
+        recheck();
+    }
+
+    /** Block a heard block b's beacon: they're on the same CC network. */
+    public void heard(Port a, Port b) {
+        if (a == b || !ports.containsKey(a) || !ports.containsKey(b)) return;
+        var m = peers.computeIfAbsent(a, k -> new IdentityHashMap<>());
+        boolean fresh = m.getOrDefault(b, 0L) <= clock.getAsLong();
+        m.put(b, clock.getAsLong() + PEER_TTL);
+        if (fresh) recheck();
+    }
+
+    /** Which blocks stand by: those sharing a network with one that ranks lower (or as low, and came first). */
+    private void recheck() {
+        var order = new ArrayList<>(ports.keySet());
+        for (int i = 0; i < order.size(); i++) {
+            var p = order.get(i);
+            Port first = null;
+            for (int j = 0; j < order.size(); j++) {
+                var q = order.get(j);
+                if (q == p || !together(p, q)) continue;
+                if (q.rank() < p.rank() || q.rank() == p.rank() && j < i) {
+                    if (first == null || q.rank() < first.rank()) first = q;
+                }
+            }
+            var was = standby.get(p);
+            if (first == was) continue;
+            if (first == null) standby.remove(p);
+            else standby.put(p, first);
+            if (first != null) macs.values().removeIf(l -> l.port() == p);
+            p.standby(first);
+        }
+    }
+
+    /** The block p stands by for, or null if it works. */
+    public Port standingBy(Port p) {
+        return standby.get(p);
+    }
+
+    private boolean together(Port a, Port b) {
+        long now = clock.getAsLong();
+        var x = peers.get(a);
+        var y = peers.get(b);
+        return a == b || x != null && x.getOrDefault(b, 0L) > now || y != null && y.getOrDefault(a, 0L) > now;
+    }
+
+    /** One block on each CC network, but none on from's. */
+    private List<Port> onePerNetwork(Port from) {
+        var out = new ArrayList<Port>();
+        for (var p : ports.keySet()) {
+            if (standby.containsKey(p) || from != null && together(p, from)) continue;
+            boolean covered = false;
+            for (var q : out) covered |= together(p, q);
+            if (!covered) out.add(p);
+        }
+        return out;
     }
 
     // ---------------------------------------------------------------------------------------------------------------
     // From CC
     // ---------------------------------------------------------------------------------------------------------------
 
-    /** A modem message heard by a port. The same one heard by two ports (one network) counts once. */
+    /**
+     * A modem message heard by a block, on the gateway's channel or a VLAN's. The same one heard by two blocks (one
+     * network) counts once.
+     */
     public void fromCc(Port port, int channel, Object payload) {
         var s = settings;
-        if (channel != s.channel() || !(payload instanceof Map<?, ?> f) || seen(payload)) return;
+        int vlan = channel - s.channel();
+        if (vlan < 0 || vlan > VLAN_MAX || vlan > 0 && !vlans.get(vlan)) return;
+        if (!(payload instanceof Map<?, ?> f) || seen(payload)) return;
         if (!(f.get("ccnet") instanceof Number n) || n.doubleValue() != 1) return;
         if (!(f.get("src") instanceof String src) || !(f.get("dst") instanceof String dst)) return;
-        if (src.equals(s.mac())) return;
-        boolean mine = dst.equals(s.mac());
-        if (!mine && !dst.equals(BROADCAST)) return;
-        if (ports.contains(port)) heardOn.put(src, port);
+        var stats = ports.get(port);
+        if (stats == null || standby.containsKey(port) || src.equals(s.mac())) return;
+        stats.in++;
+        if (vlan > 0) stats.vlans.set(vlan);
+        macs.put(channel + " " + src, new Learned(port, clock.getAsLong() + MAC_TTL));
+        boolean mine = vlan == 0 && dst.equals(s.mac());
+        if (!mine) relay(port, channel, f, dst);
+        if (vlan > 0 || !mine && !dst.equals(BROADCAST)) return;
         Object type = f.get("type");
         if ("arp".equals(type)) arpIn(f.get("data"));
         else if ("ip".equals(type)) ipIn(mine, f.get("data"));
+    }
+
+    /** A frame from one block's network on to the others: where its MAC was heard, else to every other network. */
+    private void relay(Port from, int channel, Map<?, ?> frame, String dst) {
+        @SuppressWarnings("unchecked") var f = (Map<String, Object>) frame;
+        var to = dst.equals(BROADCAST) ? null : learned(channel, dst);
+        if (to != null) {
+            if (!together(to, from)) out(to, channel, f, true);
+            return;
+        }
+        for (var p : onePerNetwork(from)) out(p, channel, f, true);
+    }
+
+    private Port learned(int channel, String mac) {
+        var l = macs.get(channel + " " + mac);
+        return l == null || l.expires() <= clock.getAsLong() || !ports.containsKey(l.port()) || standby.containsKey(l.port())
+            ? null : l.port();
+    }
+
+    private void out(Port p, int channel, Map<String, Object> f, boolean relay) {
+        var stats = ports.get(p);
+        if (stats == null) return;
+        stats.out++;
+        if (relay) {
+            stats.relayed++;
+            relayed++;
+        }
+        p.send(channel, f);
     }
 
     private boolean seen(Object payload) {
@@ -200,7 +357,7 @@ public final class Gateway {
         send(BROADCAST, "arp", table("op", "request", "sha", s.mac(), "spa", s.ip(), "tpa", w.ip));
     }
 
-    /** ARP retries and expiry; call it a few times a second. */
+    /** ARP retries and expiry, and the blocks' beacons; call it a few times a second. */
     public void tick() {
         long now = clock.getAsLong();
         for (Iterator<Waiting> it = waiting.values().iterator(); it.hasNext(); ) {
@@ -214,6 +371,14 @@ public final class Gateway {
             }
         }
         arp.values().removeIf(n -> n.expires() <= now);
+        macs.values().removeIf(l -> l.expires() <= now);
+        boolean lost = false;
+        for (var m : peers.values()) lost |= m.values().removeIf(t -> t <= now);
+        if (lost) recheck();
+        if (now >= nextHello) {
+            nextHello = now + HELLO_EVERY;
+            for (var p : ports.keySet()) p.hello();
+        }
     }
 
     // ---------------------------------------------------------------------------------------------------------------
@@ -221,11 +386,11 @@ public final class Gateway {
     private void send(String dstMac, String type, Object data) {
         var s = settings;
         var f = table("ccnet", 1, "dst", dstMac, "src", s.mac(), "type", type, "data", data);
-        var port = dstMac.equals(BROADCAST) ? null : heardOn.get(dstMac);
+        var port = dstMac.equals(BROADCAST) ? null : learned(s.channel(), dstMac);
         if (port != null) {
-            port.send(s.channel(), f);
+            out(port, s.channel(), f, false);
         } else {
-            for (var p : ports) p.send(s.channel(), f);
+            for (var p : onePerNetwork(null)) out(p, s.channel(), f, false);
         }
     }
 
@@ -235,18 +400,68 @@ public final class Gateway {
         return m;
     }
 
-    /** What /gateway shows. */
+    /** "1-4094", "10, 20, 100-199", "none": a set of VLANs as people read it. */
+    public static String says(BitSet vlans) {
+        if (vlans.isEmpty()) return "none";
+        var parts = new ArrayList<String>();
+        for (int lo = vlans.nextSetBit(0); lo >= 0; ) {
+            int hi = vlans.nextClearBit(lo) - 1;
+            parts.add(lo == hi ? String.valueOf(lo) : lo + "-" + hi);
+            lo = vlans.nextSetBit(hi + 1);
+        }
+        return String.join(", ", parts);
+    }
+
+    /** How many CC networks the blocks are on. */
+    public int networks() {
+        return onePerNetwork(null).size();
+    }
+
+    /** What /ccnix shows. */
     public List<String> status() {
         var s = settings;
         long now = clock.getAsLong();
         var out = new ArrayList<String>();
         out.add("address " + s.address() + ", MAC \"" + s.mac() + "\", channel " + s.channel() + ", " + ports.size()
-            + (ports.size() == 1 ? " block" : " blocks"));
+            + (ports.size() == 1 ? " block" : " blocks") + " (" + standby.size() + " standing by)"
+            + "; VLANs carried: " + says(vlans));
         for (var r : s.routes()) out.add("route " + r);
         arp.forEach((ip, n) -> out.add("neighbour " + Ipv4.ipString(ip) + " is " + n.mac() + " ("
             + Math.max(0, (n.expires() - now) / 1000) + " s)"));
         waiting.forEach((ip, w) -> out.add("asking ARP for " + Ipv4.ipString(ip) + ": " + w.packets.size() + " waiting"));
-        out.add("packets: " + toTun + " from CC, " + toCc + " into CC, " + dropped + " dropped; " + arpAsked + " ARP requests");
+        out.add("packets: " + toTun + " from CC, " + toCc + " into CC, " + dropped + " dropped; " + arpAsked
+            + " ARP requests; " + relayed + " frames passed between blocks");
+        return out;
+    }
+
+    /** One block's part, for its right-click. */
+    public List<String> portStatus(Port p) {
+        var stats = ports.get(p);
+        if (stats == null) return List.of("this block isn't on the gateway yet");
+        long now = clock.getAsLong();
+        var behind = new TreeSet<String>();
+        int base = settings.channel();
+        macs.forEach((key, l) -> {
+            if (l.port() != p || l.expires() <= now) return;
+            int sp = key.indexOf(' ');
+            int vlan = Integer.parseInt(key.substring(0, sp)) - base;
+            behind.add(key.substring(sp + 1) + (vlan > 0 ? " (VLAN " + vlan + ")" : ""));
+        });
+        int sharing = 0;
+        for (var q : ports.keySet()) if (q != p && together(p, q)) sharing++;
+        var out = new ArrayList<String>();
+        if (standby.containsKey(p)) {
+            out.add("standing by: another gateway block is on this cable network, and only one works on each (this one"
+                + " takes over if that one goes)");
+            return out;
+        }
+        out.add("frames: " + stats.in + " in, " + stats.out + " out (" + stats.relayed + " from other blocks)");
+        out.add(behind.size() + (behind.size() == 1 ? " MAC" : " MACs") + " heard here"
+            + (behind.isEmpty() ? "" : ": " + String.join(", ", behind.stream().limit(8).toList())
+            + (behind.size() > 8 ? ", ..." : "")));
+        out.add("VLANs seen here: " + says(stats.vlans));
+        out.add(sharing == 0 ? "the only block on its network" : sharing
+            + (sharing == 1 ? " other block stands by" : " other blocks stand by") + " on its network");
         return out;
     }
 }

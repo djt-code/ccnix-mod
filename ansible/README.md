@@ -77,6 +77,11 @@ variables say:
 Ops' routes are no larger than `ccnix_op_route_max_subnet` (16: a /16)
 and inside `ccnix_cc_networks`; they never reach the host's routing.
 
+The gateway blocks' exchange: `ccnix_gateway_vlans` (`"1-4094"`) are the
+VLANs carried between blocks besides the untagged one, and
+`ccnix_gateway_max_per_player` (5; 0 for any number) how many blocks one
+player may have placed.
+
 **NAT mode's settings** (`[nat]`), all the admin's:
 
 | Variable | Default | |

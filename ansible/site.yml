@@ -174,6 +174,8 @@
           - { section: gateway, key: mac, value: '"{{ ccnix_gateway_mac }}"' }
           - { section: gateway, key: opRoutes, value: "{{ ccnix_op_routes | bool | lower }}" }
           - { section: gateway, key: opMaxSubnet, value: "{{ ccnix_op_route_max_subnet }}" }
+          - { section: gateway, key: vlans, value: '"{{ ccnix_gateway_vlans }}"' }
+          - { section: gateway, key: maxPerPlayer, value: "{{ ccnix_gateway_max_per_player }}" }
           - { section: nat, key: deny, value: "[{{ ccnix_nat_deny | map('to_json') | join(', ') }}]" }
           - { section: nat, key: allow, value: "[{{ ccnix_nat_allow | map('to_json') | join(', ') }}]" }
           - { section: nat, key: maxPerComputer, value: "{{ ccnix_nat_max_per_computer }}" }

@@ -15,11 +15,30 @@ class GatewayTest {
 
     static final class Port implements Gateway.Port {
         final List<Map<String, Object>> sent = new ArrayList<>();
+        final List<Integer> channels = new ArrayList<>();
+        int hellos;
+        long rank;
+        final List<Gateway.Port> standbys = new ArrayList<>();
 
         @Override
         public void send(int channel, Map<String, Object> frame) {
-            assertEquals(CH, channel);
+            channels.add(channel);
             sent.add(frame);
+        }
+
+        @Override
+        public void hello() {
+            hellos++;
+        }
+
+        @Override
+        public long rank() {
+            return rank;
+        }
+
+        @Override
+        public void standby(Gateway.Port active) {
+            standbys.add(active);
         }
     }
 
@@ -66,9 +85,11 @@ class GatewayTest {
 
     @Test
     void answersArpForItsAddress() {
-        g.fromCc(lan, CH, arpRequest("3:back", "10.0.0.2", "10.0.0.1"));
+        var question = arpRequest("3:back", "10.0.0.2", "10.0.0.1");
+        g.fromCc(lan, CH, question);
         assertEquals(1, lan.sent.size());
-        assertEquals(0, other.sent.size(), "the answer goes where the question came from");
+        assertEquals(List.of(question), other.sent, "the question, a broadcast, crosses the exchange; the answer goes"
+            + " only where the question came from");
         var f = lan.sent.get(0);
         assertEquals(1, f.get("ccnet"));
         assertEquals("3:back", f.get("dst"));
@@ -84,12 +105,124 @@ class GatewayTest {
     @Test
     void ignoresWhatIsntForIt() {
         g.fromCc(lan, CH, arpRequest("3:back", "10.0.0.2", "10.0.0.9"));
-        g.fromCc(lan, CH + 1, arpRequest("3:back", "10.0.0.2", "10.0.0.1"));
-        g.fromCc(lan, CH, frame("gateway", "*", "arp", t("op", "request", "sha", "gateway", "spa", ip("10.0.0.1"), "tpa", ip("10.0.0.1"))));
+        g.fromCc(lan, CH + 1, arpRequest("3:back.1", "10.0.0.2", "10.0.0.1"));
         g.fromCc(lan, CH, frame("3:back", "4:back", "ip", t()));
+        assertEquals(0, lan.sent.size() + tun.size(), "not the gateway's: nothing answered, nothing into the TUN");
+        assertEquals(List.of(CH, CH + 1, CH), other.channels, "but carried across the exchange (and VLAN 1)");
+        g.fromCc(lan, CH, frame("gateway", "*", "arp", t("op", "request", "sha", "gateway", "spa", ip("10.0.0.1"), "tpa", ip("10.0.0.1"))));
         g.fromCc(lan, CH, t("hello", "world"));
         g.fromCc(lan, CH, "rednet, say");
-        assertEquals(0, lan.sent.size() + other.sent.size() + tun.size());
+        g.fromCc(lan, CH - 1, arpRequest("3:back", "10.0.0.2", "10.0.0.1"));
+        g.fromCc(lan, CH + Gateway.VLAN_MAX + 1, arpRequest("3:back", "10.0.0.2", "10.0.0.1"));
+        assertEquals(3, other.sent.size(), "its own MAC, not lib/net's frames, other channels: not even carried");
+    }
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // The exchange
+    // ---------------------------------------------------------------------------------------------------------------
+
+    @Test
+    void theExchangeLearnsWhereMacsAre() {
+        var third = new Port();
+        g.addPort(third);
+        var toB = frame("3:back", "4:back", "ip", t());
+        g.fromCc(lan, CH, toB);
+        assertEquals(List.of(toB), other.sent, "4:back not heard yet: to every other block");
+        assertEquals(List.of(toB), third.sent);
+        assertEquals(0, lan.sent.size(), "never back where it came from");
+        var back = frame("4:back", "3:back", "ip", t());
+        g.fromCc(third, CH, back);
+        assertEquals(List.of(back), lan.sent, "3:back was heard on lan: only there");
+        assertEquals(1, other.sent.size());
+        var again = frame("3:back", "4:back", "ip", t());
+        g.fromCc(lan, CH, again);
+        assertEquals(List.of(toB, again), third.sent, "and 4:back on third");
+        assertEquals(1, other.sent.size());
+        assertEquals(4, g.relayed);
+        assertEquals(0, tun.size());
+    }
+
+    @Test
+    void vlansCarriedAreTheConfigs() {
+        var problems = new ArrayList<String>();
+        g.configureVlans(Gateway.vlans("20, 100-102", problems));
+        assertEquals(List.of(), problems);
+        g.fromCc(lan, CH + 20, frame("3:back.20", "*", "arp", t()));
+        g.fromCc(lan, CH + 101, frame("3:back.101", "*", "arp", t()));
+        g.fromCc(lan, CH + 30, frame("3:back.30", "*", "arp", t()));
+        assertEquals(List.of(CH + 20, CH + 101), other.channels, "VLAN 30 isn't carried");
+        assertEquals("20, 100-102", Gateway.says(Gateway.vlans("20, 100-102", problems)));
+        assertEquals("1-4094", Gateway.says(Gateway.vlans("1-4094", problems)));
+        assertEquals("none", Gateway.says(Gateway.vlans("", problems)));
+        assertEquals(List.of(), problems);
+        Gateway.vlans("0, 5-3, 4095, x, 7", problems);
+        assertEquals(4, problems.size(), problems.toString());
+    }
+
+    @Test
+    void aSecondBlockOnOneNetworkStandsBy() {
+        var third = new Port();                         // (on lan's network: they hear each other's beacons)
+        third.rank = 7;
+        lan.rank = 3;
+        g.addPort(third);
+        for (now = 0; now < 3000; now += 250) g.tick();
+        assertTrue(lan.hellos >= 2 && third.hellos >= 2 && other.hellos >= 2, "beacons every 2 s");
+        g.heard(third, lan);
+        assertSame(lan, g.standingBy(third), "the higher rank stands by");
+        assertNull(g.standingBy(lan));
+        assertEquals(java.util.Arrays.asList(lan), third.standbys, "and is told so, once");
+        g.heard(third, lan);
+        assertEquals(1, third.standbys.size());
+
+        g.fromCc(other, CH, arpRequest("4:back", "10.0.0.4", "10.0.0.9"));
+        assertEquals(1, lan.sent.size(), "into lan's network once, through lan");
+        assertEquals(0, third.sent.size());
+        g.fromCc(third, CH, frame("3:back", "*", "arp", t()));
+        assertEquals(0, other.sent.size(), "what the spare hears isn't carried (lan heard it too)");
+        g.fromTun(udpTo("10.0.0.255"));
+        assertEquals(0, third.sent.size(), "nor the gateway's own");
+        assertEquals(2, g.networks());
+        assertEquals(List.of("standing by: another gateway block is on this cable network, and only one works on each"
+            + " (this one takes over if that one goes)"), g.portStatus(third));
+        assertTrue(g.portStatus(lan).contains("1 other block stands by on its network"), g.portStatus(lan).toString());
+
+        g.removePort(lan);                              // (lan's chunk unloads)
+        assertNull(g.standingBy(third), "the spare takes over at once");
+        assertEquals(java.util.Arrays.asList(lan, null), third.standbys);
+        g.fromCc(other, CH, arpRequest("4:back", "10.0.0.4", "10.0.0.8"));
+        assertEquals(1, third.sent.size());
+
+        g.addPort(lan);
+        g.heard(lan, third);
+        assertSame(lan, g.standingBy(third), "lan back: it ranks lower, so it works again and the spare stands by");
+    }
+
+    @Test
+    void apartAgainWhenTheBeaconsStop() {
+        var third = new Port();
+        g.addPort(third);
+        g.heard(lan, third);
+        assertSame(lan, g.standingBy(third), "the same rank: the first one works");
+        now += Gateway.PEER_TTL + 1;                    // (the cable cut: no more beacons heard)
+        g.tick();
+        assertNull(g.standingBy(third));
+        assertEquals(3, g.networks());
+        g.fromCc(other, CH, arpRequest("4:back", "10.0.0.4", "10.0.0.8"));
+        assertEquals(1, lan.sent.size());
+        assertEquals(1, third.sent.size(), "apart again: each gets one");
+    }
+
+    @Test
+    void eachBlocksStatus() {
+        g.fromCc(lan, CH, frame("3:back", "*", "arp", t()));
+        g.fromCc(lan, CH + 20, frame("3:back.20", "*", "arp", t()));
+        var lines = g.portStatus(lan);
+        assertEquals("frames: 2 in, 0 out (0 from other blocks)", lines.get(0));
+        assertEquals("2 MACs heard here: 3:back, 3:back.20 (VLAN 20)", lines.get(1));
+        assertEquals("VLANs seen here: 20", lines.get(2));
+        assertEquals("the only block on its network", lines.get(3));
+        assertEquals("frames: 0 in, 2 out (2 from other blocks)", g.portStatus(other).get(0));
+        assertEquals(List.of("this block isn't on the gateway yet"), g.portStatus(new Port()));
     }
 
     static Map<String, Object> ping(String from, String to) {
@@ -138,7 +271,7 @@ class GatewayTest {
         assertEquals((long) ip("10.0.0.1"), data(q, "spa"));
 
         g.fromCc(other, CH, arpReply("5:back", "10.0.0.5"));
-        assertEquals(1, lan.sent.size());
+        assertEquals(1, lan.sent.size(), "a reply to the gateway stays with the gateway");
         assertEquals(3, other.sent.size(), "both packets, out of the port the answer came in on");
         var f = other.sent.get(1);
         assertEquals("5:back", f.get("dst"));

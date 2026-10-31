@@ -51,6 +51,12 @@ ccnix_op_routes: true
 ccnix_op_route_max_subnet: 16
 ccnix_ansible_routes: false
 
+# The exchange every gateway block joins: the VLANs carried between blocks
+# besides the untagged one ("1-4094", "10,20,100-199", "" none), and how
+# many blocks one player may have placed (0: any number).
+ccnix_gateway_vlans: "1-4094"
+ccnix_gateway_max_per_player: 5
+
 # NAT mode ([nat]).  The policy and limits apply only to CC computers'
 # connections through a Network Gateway, never to the server's or players'.
 ccnix_nat_deny: ["0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16",

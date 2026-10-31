@@ -10,25 +10,39 @@ import dan200.computercraft.api.network.wired.WiredElementCapability;
 import dan200.computercraft.api.network.wired.WiredNode;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.capabilities.BlockCapabilityCache;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * A gateway block: a node on CC's wired network (cables join it from any side, as with a full-block modem) that
- * hears every packet on it and passes those on the gateway's channel to the gateway, and sends the gateway's frames
- * into it.
+ * hears every packet on it and passes those on the gateway's channel and its VLANs' to the gateway, and sends the
+ * gateway's frames (its own, and other blocks' it carries) into it. Each has an ID and the player who placed it.
  */
 public final class GatewayBlockEntity extends BlockEntity implements Gateway.Port {
+    /** The blocks' beacon: on a channel no modem can open, so only blocks hear it. */
+    static final int HELLO = -1;
+
     private final Element element = new Element();
     private final WiredNode node = ComputerCraftAPI.createWiredNodeForElement(element);
     @SuppressWarnings("unchecked")
     private final BlockCapabilityCache<WiredElement, Direction>[] neighbours = new BlockCapabilityCache[6];
+    private volatile int id;
+    private UUID owner;
+    private String ownerName = "";
+    private boolean warned;
 
     public GatewayBlockEntity(BlockPos pos, BlockState state) {
         super(Ccnix.GATEWAY_ENTITY.get(), pos, state);
@@ -39,12 +53,34 @@ public final class GatewayBlockEntity extends BlockEntity implements Gateway.Por
         return element;
     }
 
+    /** Its ID (0 until it's on a server). */
+    public int id() {
+        return id;
+    }
+
     @Override
     public void onLoad() {
         super.onLoad();
-        if (level instanceof ServerLevel) {
+        if (level instanceof ServerLevel server) {
+            var registry = GatewayRegistry.get(server.getServer());
+            if (id == 0) {
+                id = registry.add(level, worldPosition);
+                setChanged();
+            } else {
+                registry.put(id, owner, ownerName, level, worldPosition);
+            }
             Service.addPort(this);
             scheduleConnect();
+        }
+    }
+
+    /** Placed by player: theirs, and counted against their limit. */
+    void placedBy(ServerPlayer player) {
+        owner = player.getUUID();
+        ownerName = player.getGameProfile().getName();
+        setChanged();
+        if (level instanceof ServerLevel server && id > 0) {
+            GatewayRegistry.get(server.getServer()).put(id, owner, ownerName, level, worldPosition);
         }
     }
 
@@ -55,6 +91,24 @@ public final class GatewayBlockEntity extends BlockEntity implements Gateway.Por
             Service.removePort(this);
             node.remove();
         }
+    }
+
+    @Override
+    protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
+        super.saveAdditional(tag, registries);
+        if (id > 0) tag.putInt("id", id);
+        if (owner != null) tag.putUUID("owner", owner);
+        if (!ownerName.isEmpty()) tag.putString("ownerName", ownerName);
+        if (warned) tag.putBoolean("warned", true);
+    }
+
+    @Override
+    protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
+        super.loadAdditional(tag, registries);
+        id = tag.getInt("id");
+        owner = tag.hasUUID("owner") ? tag.getUUID("owner") : null;
+        ownerName = tag.getString("ownerName");
+        warned = tag.getBoolean("warned");
     }
 
     private void scheduleConnect() {
@@ -84,9 +138,60 @@ public final class GatewayBlockEntity extends BlockEntity implements Gateway.Por
         node.transmitInterdimensional(new Packet(channel, channel, frame, element));
     }
 
+    @Override
+    public void hello() {
+        if (isRemoved() || level == null) return;
+        node.transmitInterdimensional(new Packet(HELLO, HELLO, "ccnix gateway", element));
+    }
+
+    /** The first placed works; later ones on its network stand by (no ID yet: last). */
+    @Override
+    public long rank() {
+        return id > 0 ? id : Long.MAX_VALUE;
+    }
+
+    /** Standing by: the owner is told, the first time. */
+    @Override
+    public void standby(Gateway.Port active) {
+        if (active == null || warned || !(level instanceof ServerLevel server)) return;
+        int other = active instanceof GatewayBlockEntity b ? b.id : 0;
+        server.getServer().execute(() -> {
+            warned = true;
+            setChanged();
+            var player = owner == null ? null : server.getServer().getPlayerList().getPlayer(owner);
+            if (player != null) {
+                player.displayClientMessage(Component.literal(name() + " at " + where() + " is standing by: Network"
+                    + " Gateway #" + other + " is already on its cable network, and only one works on each. It takes"
+                    + " over if #" + other + " goes (its chunk unloads, or it's broken)."), false);
+            }
+        });
+    }
+
+    /** What a right-click shows. */
+    List<String> stats() {
+        var out = new ArrayList<String>();
+        out.add(name() + (owner == null ? "" : ", placed by " + ownerName) + ", at " + where());
+        out.addAll(Service.portStatus(this));
+        return out;
+    }
+
+    private String name() {
+        return "Network Gateway #" + id;
+    }
+
+    private String where() {
+        return worldPosition.getX() + " " + worldPosition.getY() + " " + worldPosition.getZ();
+    }
+
     private void receive(Packet packet) {
-        if (packet.sender() == element || packet.channel() != Service.channel()) return;
-        Service.receive(this, packet.channel(), packet.payload());
+        if (packet.sender() == element) return;
+        if (packet.sender() instanceof Element other) {   // another block on this network
+            if (packet.channel() == HELLO) Service.heard(this, other.block());
+            return;                                     // (what a block sent is never carried again: no loops)
+        }
+        int base = Service.channel(), channel = packet.channel();
+        if (base < 0 || channel < base || channel > base + Gateway.VLAN_MAX) return;
+        Service.receive(this, channel, packet.payload());
     }
 
     private Vec3 centre() {
@@ -94,6 +199,10 @@ public final class GatewayBlockEntity extends BlockEntity implements Gateway.Por
     }
 
     private final class Element implements WiredElement {
+        GatewayBlockEntity block() {
+            return GatewayBlockEntity.this;
+        }
+
         @Override
         public WiredNode getNode() {
             return node;
