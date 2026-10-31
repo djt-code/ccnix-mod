@@ -61,8 +61,8 @@ then `/reload`. Computers see the new files at once; boot changes apply at their
 - **Status:** `/ccnix` (operators) shows which ROM is in use, its commit and where computers pull from. The server
   log says so at each load.
 
-A data pack can't hold a file whose name has capitals or `[`, so the ROM leaves out `bin/[.lua`. `ccnix update`
-fetches it into `/ccnix`, as it does any file the ROM lacks.
+A data pack can't hold a file whose name has capitals or `[`, so the ROM would leave such a file out (ccnix has none:
+`[` is a ccsh builtin). `ccnix update` fetches any file the ROM lacks into `/ccnix`.
 
 ## The Network Gateway
 

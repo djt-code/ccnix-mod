@@ -37,7 +37,7 @@ public final class Rom {
     public final long date;
     /** Repo path to contents, for the files a ROM can hold. */
     public final Map<String, byte[]> files;
-    /** Repo paths left out: names a resource path can't have ("[.lua", capitals). */
+    /** Repo paths left out: names a resource path can't have (capitals, "["). */
     public final List<String> leftOut;
 
     private Rom(String source, String commit, long date, String url, String branch, Map<String, byte[]> all) {

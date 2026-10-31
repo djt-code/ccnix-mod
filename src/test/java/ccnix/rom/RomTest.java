@@ -33,7 +33,7 @@ class RomTest {
         assertTrue(rom.version.matches("\\d+\\.\\d+\\.\\d+"), "semantic: " + rom.version);
         assertTrue(rom.files.containsKey("deploy/boot.lua") && rom.files.containsKey("bin/ccnix.lua")
             && rom.files.containsKey("lib/net.lua") && rom.files.containsKey("help/ccnix.txt"));
-        assertEquals(List.of("bin/[.lua"), rom.leftOut, "[ has no resource path");
+        assertEquals(List.of(), rom.leftOut, "every ccnix file has a resource path ([ is a ccsh builtin)");
 
         // every blob as git names it: what GitHub's tree gives, so ccnix update skips just these
         var tree = new HashMap<String, String>();
@@ -44,13 +44,12 @@ class RomTest {
             var tab = line.indexOf('\t');
             tree.put(line.substring(tab + 1), line.substring(0, tab).split(" ")[2]);
         }
-        assertEquals(tree.size() - 1, rom.files.size());
+        assertEquals(tree.size(), rom.files.size());
         rom.files.forEach((path, data) -> assertEquals(tree.get(path), Rom.blobSha(data), path));
         var manifest = new String(rom.manifest(), StandardCharsets.UTF_8);
         assertTrue(manifest.contains("\"commit\":\"" + rom.commit + "\""), manifest.substring(0, 200));
         assertTrue(manifest.startsWith("{\"version\":\"" + rom.version + "\""), manifest.substring(0, 200));
         assertTrue(manifest.contains("\"deploy/boot.lua\":\"" + tree.get("deploy/boot.lua") + "\""));
-        assertFalse(manifest.contains("[.lua"));
     }
 
     @Test
