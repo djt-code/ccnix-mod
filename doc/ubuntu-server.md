@@ -41,7 +41,7 @@ list shows 1.120.2). So:
    ```sh
    # desktop
    cd ~/Projects/ccnix-mod && git pull && ./gradlew build
-   cp build/libs/ccnix-0.6.1.jar "<your CurseForge instance folder>/mods/"
+   cp build/libs/ccnix-0.6.2.jar "<your CurseForge instance folder>/mods/"
    ```
 
 After a pack update, check the Mods screen (title screen → Mods → CC:
@@ -64,7 +64,7 @@ cd ~/Projects/ccnix-mod
 helper/server-bundle.sh "<your CurseForge instance folder>" server-bundle.tar.gz
 #   left out: cc-tweaked-1.21.1-forge-1.113.1.jar (CC: Tweaked older than 1.120)
 #   left out: sodium-neoforge-0.8.13+mc1.21.1.jar (client-only)
-#   server-bundle.tar.gz: 125 mods, with ccnix-0.6.1.jar
+#   server-bundle.tar.gz: 125 mods, with ccnix-0.6.2.jar
 scp server-bundle.tar.gz helper/ccnix-tun.c helper/ccnix-tun-setup root@<vm>:/root/
 ```
 
@@ -320,4 +320,4 @@ Windows `route add 10.0.0.0 mask 255.0.0.0 <vm address>`; then `telnet
 | R: `router` | each interface's frames, routes, forwarded/dropped, "no ARP answer" and such |
 | a host: `ip`, `ip neigh` | what's set, whether it's up, who ARP has found |
 | VM: `ip -br addr show ccnix0`, `ip route`, `tcpdump -ni ccnix0` | the device, the routes into it, the packets actually crossing |
-| `ping` says | "net unreachable": a router lacks a route; "administratively prohibited": a filter, or a NAT-mode gateway (no ping past it); "host unreachable": no ARP answer (address wrong, or not up); "time to live exceeded": a routing loop |
+| `ping` says | "net unreachable": a router lacks a route; "administratively prohibited": a filter, or a NAT-mode gateway (no ICMP past it; it answers ping itself); "host unreachable": no ARP answer (address wrong, or not up); "time to live exceeded": a routing loop |
