@@ -163,10 +163,15 @@ public final class GatewayBlockEntity extends BlockEntity implements Gateway.Por
         if (level != null && !isRemoved()) level.scheduleTick(worldPosition, getBlockState().getBlock(), 0);
     }
 
-    /** Join the wired element at its port, and let go of any on another side (its block's tick, when one comes or goes). */
+    /**
+     * Join the wired element at its port, and let go of any on another side (its block's tick, when one comes or
+     * goes). The port shows a plug while something is joined there, and the cables around are told to look again: one
+     * beside the block draws no arm to it, whatever it drew before (a block from before ports, a client's guess).
+     */
     void connect() {
         if (!(level instanceof ServerLevel server) || isRemoved()) return;
         var port = port();
+        boolean plugged = false;
         for (var side : Direction.values()) {
             var pos = worldPosition.relative(side);
             var cache = neighbours[side.ordinal()];
@@ -177,9 +182,19 @@ public final class GatewayBlockEntity extends BlockEntity implements Gateway.Por
             if (!server.isLoaded(pos)) continue;
             var other = cache.getCapability();
             if (other == null) continue;
-            if (side == port) node.connectTo(other.getNode());
-            else node.disconnectFrom(other.getNode());
+            if (side == port) {
+                node.connectTo(other.getNode());
+                plugged = true;
+            } else {
+                node.disconnectFrom(other.getNode());
+            }
         }
+        var state = getBlockState();
+        if (state.getValue(GatewayBlock.PLUGGED) != plugged) {
+            server.setBlock(worldPosition, state.setValue(GatewayBlock.PLUGGED, plugged), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
+        }
+        getBlockState().updateNeighbourShapes(server, worldPosition, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        for (var side : Direction.values()) server.getChunkSource().blockChanged(worldPosition.relative(side));
     }
 
     /** A frame from the gateway (on its thread: CC's wired network takes packets from any thread). */

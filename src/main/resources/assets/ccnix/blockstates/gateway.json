@@ -1,8 +1,34 @@
 {
   "variants": {
-    "facing=north": { "model": "ccnix:block/gateway" },
-    "facing=east": { "model": "ccnix:block/gateway", "y": 90 },
-    "facing=south": { "model": "ccnix:block/gateway", "y": 180 },
-    "facing=west": { "model": "ccnix:block/gateway", "y": 270 }
+    "facing=north,plugged=false": {
+      "model": "ccnix:block/gateway"
+    },
+    "facing=north,plugged=true": {
+      "model": "ccnix:block/gateway_plugged"
+    },
+    "facing=east,plugged=false": {
+      "model": "ccnix:block/gateway",
+      "y": 90
+    },
+    "facing=east,plugged=true": {
+      "model": "ccnix:block/gateway_plugged",
+      "y": 90
+    },
+    "facing=south,plugged=false": {
+      "model": "ccnix:block/gateway",
+      "y": 180
+    },
+    "facing=south,plugged=true": {
+      "model": "ccnix:block/gateway_plugged",
+      "y": 180
+    },
+    "facing=west,plugged=false": {
+      "model": "ccnix:block/gateway",
+      "y": 270
+    },
+    "facing=west,plugged=true": {
+      "model": "ccnix:block/gateway_plugged",
+      "y": 270
+    }
   }
 }

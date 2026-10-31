@@ -1,0 +1,35 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "ccnix:block/gateway_side",
+    "top": "ccnix:block/gateway_side",
+    "front": "ccnix:block/gateway_front",
+    "side": "ccnix:block/gateway_side",
+    "plug": "ccnix:block/gateway_plug"
+  },
+  "elements": [
+    {
+      "from": [0, 0, 0],
+      "to": [16, 16, 16],
+      "faces": {
+        "down": { "texture": "#top", "cullface": "down" },
+        "up": { "texture": "#top", "cullface": "up" },
+        "north": { "texture": "#front", "cullface": "north" },
+        "south": { "texture": "#side", "cullface": "south" },
+        "west": { "texture": "#side", "cullface": "west" },
+        "east": { "texture": "#side", "cullface": "east" }
+      }
+    },
+    {
+      "from": [5, 5.5, -1.5],
+      "to": [11, 10.5, 0.25],
+      "faces": {
+        "north": { "texture": "#plug", "uv": [2, 2, 14, 14] },
+        "up": { "texture": "#plug", "uv": [2, 0, 14, 3] },
+        "down": { "texture": "#plug", "uv": [2, 13, 14, 16] },
+        "west": { "texture": "#plug", "uv": [0, 2, 3, 14] },
+        "east": { "texture": "#plug", "uv": [13, 2, 16, 14] }
+      }
+    }
+  ]
+}

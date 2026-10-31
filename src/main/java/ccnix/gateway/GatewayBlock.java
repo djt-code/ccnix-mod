@@ -22,6 +22,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.DirectionProperty;
 import net.minecraft.world.phys.BlockHitResult;
 
@@ -32,15 +33,17 @@ import net.minecraft.world.phys.BlockHitResult;
 public final class GatewayBlock extends Block implements EntityBlock {
     public static final MapCodec<GatewayBlock> CODEC = simpleCodec(GatewayBlock::new);
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
+    /** Something is joined at the port: drawn as a plug in it. */
+    public static final BooleanProperty PLUGGED = BooleanProperty.create("plugged");
 
     public GatewayBlock(Properties properties) {
         super(properties);
-        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH));
+        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(PLUGGED, false));
     }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACING);
+        builder.add(FACING, PLUGGED);
     }
 
     /** The port faces whoever placed it. */
