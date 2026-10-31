@@ -16,13 +16,14 @@ class OpRoutesTest {
         broadcast 10.0.0.255 table local proto kernel scope link src 10.0.0.1\s
         """;
     static final List<OpRoutes.HostRoute> TUN = OpRoutes.parseIpRoutes(IP_OUTPUT);
+    static final List<NatConfig.Net> NETS = List.of(NatConfig.net("0.0.0.0/0"));   // (any: these are about the kernel)
 
     static Settings settings(String... routes) {
         return Settings.parse("10.0.0.1/24", 4040, "gateway", List.of(routes), new ArrayList<>());
     }
 
     static String problem(String line) {
-        return OpRoutes.add(line, settings("10.1.0.0/16 via 10.0.0.2"), 16, TUN).problem();
+        return OpRoutes.add(line, settings("10.1.0.0/16 via 10.0.0.2"), 16, NETS, TUN).problem();
     }
 
     @Test
@@ -38,7 +39,7 @@ class OpRoutesTest {
 
     @Test
     void aRouteAnOpMayAdd() {
-        var c = OpRoutes.add("10.2.0.0/16 via 10.0.0.3", settings("10.1.0.0/16 via 10.0.0.2"), 16, TUN);
+        var c = OpRoutes.add("10.2.0.0/16 via 10.0.0.3", settings("10.1.0.0/16 via 10.0.0.2"), 16, NETS, TUN);
         assertNull(c.problem());
         assertEquals("10.2.0.0/16 via 10.0.0.3", c.route().toString());
         assertNull(problem("10.2.5.0/24 via 10.0.0.3"), "smaller is fine");
@@ -49,7 +50,7 @@ class OpRoutesTest {
     void tooLarge() {
         assertTrue(problem("10.0.0.0/8 via 10.0.0.3").contains("/16 at most"));
         assertTrue(problem("10.16.0.0/12 via 10.0.0.3").contains("larger than ops may route"));
-        assertNull(OpRoutes.add("10.16.0.0/12 via 10.0.0.3", settings(), 12, TUN).problem(), "as the config allows");
+        assertNull(OpRoutes.add("10.16.0.0/12 via 10.0.0.3", settings(), 12, NETS, TUN).problem(), "as the config allows");
     }
 
     @Test
@@ -57,7 +58,7 @@ class OpRoutesTest {
         // a public network, or the host's own LAN: the server doesn't route them into the device, so no op can
         assertTrue(problem("8.8.0.0/16 via 10.0.0.3").contains("doesn't route 8.8.0.0/16 into the TUN device"));
         assertTrue(problem("192.168.1.0/24 via 10.0.0.3").contains("it routes 10.0.0.0/8 (table 4040), 10.0.0.0/24"));
-        assertTrue(OpRoutes.add("10.2.0.0/16 via 10.0.0.3", settings(), 16, List.of()).problem().contains("routes nothing there"));
+        assertTrue(OpRoutes.add("10.2.0.0/16 via 10.0.0.3", settings(), 16, NETS, List.of()).problem().contains("routes nothing there"));
     }
 
     @Test
@@ -80,5 +81,15 @@ class OpRoutesTest {
         assertTrue(problem("10.0.0.0/16 via 10.0.0.3").contains("overlaps the gateway's own network"));
         assertTrue(problem("10.1.0.0/16 via 10.0.0.3").contains("routed already (10.1.0.0/16 via 10.0.0.2)"));
         assertTrue(problem("10.1.0.0/16").contains("a.b.c.d/len via a.b.c.d"));
+    }
+
+    @Test
+    void insideTheCcNetworksInEitherMode() {
+        var nets = List.of(NatConfig.net("10.1.0.0/16"));
+        assertNull(OpRoutes.add("10.1.5.0/24 via 10.0.0.3", settings(), 16, nets, null).problem(), "NAT mode: no kernel to ask");
+        assertTrue(OpRoutes.add("10.2.0.0/16 via 10.0.0.3", settings(), 16, nets, null).problem()
+            .contains("isn't inside the CC networks this gateway carries (10.1.0.0/16)"));
+        assertTrue(OpRoutes.add("10.2.0.0/15 via 10.0.0.3", settings(), 8, List.of(NatConfig.net("10.2.0.0/16")), TUN)
+            .problem().contains("isn't inside"), "larger than the network it's in");
     }
 }

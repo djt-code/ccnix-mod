@@ -1,6 +1,8 @@
 package ccnix;
 
 import ccnix.gateway.Service;
+import ccnix.gateway.core.NatConfig;
+import ccnix.gateway.core.OpForwards;
 import ccnix.gateway.core.OpRoutes;
 import ccnix.gateway.core.Settings;
 import ccnix.rom.Rom;
@@ -29,16 +31,20 @@ import static net.minecraft.commands.Commands.argument;
 import static net.minecraft.commands.Commands.literal;
 
 /**
- * /ccnix: what the ROM and the gateway are doing (permission level 2), and for ops (level 3): the gateway's routes and
- * a ROM update.
+ * /ccnix: what the ROM and the gateway are doing (permission level 2), and for ops (level 3): the gateway's routes,
+ * port forwards (NAT mode) and a ROM update.
  * <pre>
  *   /ccnix                                  the ROM, then the gateway
- *   /ccnix route                            the gateway's routes, and the server's into the TUN device
+ *   /ccnix route                            the gateway's routes, and in TUN mode the server's into the device
  *   /ccnix route add &lt;net/len&gt; via &lt;router&gt;  (gateway.opRoutes, and no larger than gateway.opMaxSubnet)
  *   /ccnix route del &lt;net/len&gt;
+ *   /ccnix forward                          the port forwards, and the ports ops may forward
+ *   /ccnix forward add &lt;port&gt;[/udp] &lt;a.b.c.d&gt;:&lt;port&gt;   (NAT mode, nat.opForwards, on nat.opForwardPorts)
+ *   /ccnix forward del &lt;port&gt;[/udp]
  *   /ccnix rom update                       git pull (or clone) ccnix-rom/ in the server's folder, then reload
  * </pre>
- * Route changes are saved in config/ccnix-server.toml and apply at once.
+ * Route and forward changes are saved in config/ccnix-server.toml and apply at once. The mode is the server admin's,
+ * set in the config only.
  */
 final class CcnixCommand {
     private static final Logger LOG = LogUtils.getLogger();
@@ -56,6 +62,12 @@ final class CcnixCommand {
                     .then(argument("route", greedyString()).executes(ctx -> addRoute(ctx.getSource(), getString(ctx, "route")))))
                 .then(literal("del").requires(s -> s.hasPermission(OPS))
                     .then(argument("network", greedyString()).executes(ctx -> delRoute(ctx.getSource(), getString(ctx, "network"))))))
+            .then(literal("forward")
+                .executes(ctx -> say(ctx, forwards()))
+                .then(literal("add").requires(s -> s.hasPermission(OPS))
+                    .then(argument("forward", greedyString()).executes(ctx -> addForward(ctx.getSource(), getString(ctx, "forward")))))
+                .then(literal("del").requires(s -> s.hasPermission(OPS))
+                    .then(argument("port", greedyString()).executes(ctx -> delForward(ctx.getSource(), getString(ctx, "port"))))))
             .then(literal("rom")
                 .executes(ctx -> say(ctx, romStatus()))
                 .then(literal("update").requires(s -> s.hasPermission(OPS)).executes(ctx -> updateRom(ctx.getSource())))));
@@ -105,25 +117,30 @@ final class CcnixCommand {
             ? " (ops may change them, a /" + Config.OP_MAX_SUBNET.get() + " at most: /ccnix route add|del)"
             : " (ops can't change them: gateway.opRoutes)"));
         for (var r : s.routes()) out.add("  " + r);
-        try {
-            var host = Service.hostRoutes();
-            out.add("the server routes into " + Config.DEVICE.get() + ": "
-                + (host.isEmpty() ? "nothing" : String.join(", ", host.stream().map(OpRoutes.HostRoute::toString).toList())));
-        } catch (IOException e) {
-            out.add("the server's routes into " + Config.DEVICE.get() + " can't be read: " + e.getMessage());
+        out.add("CC networks it carries: " + String.join(", ", Service.natConfig().networks().stream().map(NatConfig.Net::toString).toList()));
+        if (Service.mode().equals("tun")) {
+            try {
+                var host = Service.hostRoutes();
+                out.add("the server routes into " + Config.DEVICE.get() + ": "
+                    + (host.isEmpty() ? "nothing" : String.join(", ", host.stream().map(OpRoutes.HostRoute::toString).toList())));
+            } catch (IOException e) {
+                out.add("the server's routes into " + Config.DEVICE.get() + " can't be read: " + e.getMessage());
+            }
         }
         return out;
     }
 
     private static int addRoute(CommandSourceStack src, String line) {
         if (!Config.OP_ROUTES.get()) return fail(src, "Ops can't change the gateway's routes on this server (gateway.opRoutes)");
-        List<OpRoutes.HostRoute> host;
-        try {
-            host = Service.hostRoutes();
-        } catch (IOException e) {
-            return fail(src, "Can't read the server's routes into " + Config.DEVICE.get() + ": " + e.getMessage());
+        List<OpRoutes.HostRoute> host = null;
+        if (Service.mode().equals("tun")) {
+            try {
+                host = Service.hostRoutes();
+            } catch (IOException e) {
+                return fail(src, "Can't read the server's routes into " + Config.DEVICE.get() + ": " + e.getMessage());
+            }
         }
-        var check = OpRoutes.add(line, Service.settings(), Config.OP_MAX_SUBNET.get(), host);
+        var check = OpRoutes.add(line, Service.settings(), Config.OP_MAX_SUBNET.get(), Service.natConfig().networks(), host);
         if (check.problem() != null) return fail(src, "Not added: " + check.problem());
         var list = new ArrayList<String>(Config.ROUTES.get());
         list.add(check.route().toString());
@@ -155,6 +172,64 @@ final class CcnixCommand {
     private static void save(List<String> routes) {
         Config.ROUTES.set(routes);
         Config.ROUTES.save();
+        Service.reconfigure();
+    }
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // Port forwards (NAT mode)
+    // ---------------------------------------------------------------------------------------------------------------
+
+    private static int[] opRange() {
+        return OpForwards.range(Config.OP_FORWARD_PORTS.get());
+    }
+
+    private static List<String> forwards() {
+        var out = new ArrayList<String>();
+        if (!Service.mode().equals("nat")) {
+            out.add("TUN mode: no port forwards here; the server's admin forwards ports with the host's firewall");
+            return out;
+        }
+        var list = Service.natConfig().forwards();
+        var closed = OpForwards.closed(true, Config.OP_FORWARDS.get(), opRange());
+        out.add((list.isEmpty() ? "no port forwards" : list.size() + " port forward" + (list.size() == 1 ? "" : "s"))
+            + (closed == null ? " (ops may forward " + OpForwards.says(opRange())
+            + ": /ccnix forward add <port>[/udp] <a.b.c.d>:<port>)" : " (" + closed + ")"));
+        for (var f : list) out.add("  " + f);
+        return out;
+    }
+
+    private static int addForward(CommandSourceStack src, String line) {
+        var cfg = Service.natConfig();
+        var check = OpForwards.add(line, Service.mode().equals("nat"), Config.OP_FORWARDS.get(), opRange(), cfg.networks(),
+            cfg.forwards());
+        if (check.problem() != null) return fail(src, "Not added: " + check.problem());
+        var list = new ArrayList<String>(Config.FORWARDS.get());
+        list.add(check.forward().toString());
+        saveForwards(list);
+        LOG.info("ccnix: {} added the forward {}", src.getTextName(), check.forward());
+        src.sendSuccess(() -> Component.literal("Forwarding " + check.forward() + " (ops may forward "
+            + OpForwards.says(opRange()) + ")"), true);
+        return 1;
+    }
+
+    private static int delForward(CommandSourceStack src, String port) {
+        var check = OpForwards.del(port, Service.mode().equals("nat"), Config.OP_FORWARDS.get(), opRange(),
+            Service.natConfig().forwards());
+        if (check.problem() != null) return fail(src, "Not removed: " + check.problem());
+        var key = check.forward().key();
+        var list = new ArrayList<String>();
+        for (var line : Config.FORWARDS.get()) {
+            if (!(NatConfig.forward(line) instanceof NatConfig.Forward f && f.key().equals(key))) list.add(line);
+        }
+        saveForwards(list);
+        LOG.info("ccnix: {} removed the forward {}", src.getTextName(), check.forward());
+        src.sendSuccess(() -> Component.literal("Removed the forward " + check.forward()), true);
+        return 1;
+    }
+
+    private static void saveForwards(List<String> forwards) {
+        Config.FORWARDS.set(forwards);
+        Config.FORWARDS.save();
         Service.reconfigure();
     }
 

@@ -7,10 +7,10 @@ import java.util.Set;
 /**
  * The routes ops may add to the gateway in game (/ccnix route add), checked with no game in it.
  * <p>
- * A gateway route only says which CC router a network is behind; it never reaches the server's own routing. The
- * server routes a fixed set of networks into the TUN device (helper/ccnix-tun-setup, from the admin), in a table of
- * their own that the host's own routes come before. So an op's route has to sit inside one of those, and nothing an
- * op does can take the host's LAN, its gateway or its way to the internet from it.
+ * A gateway route only says which CC router a network is behind; it never reaches the server's own routing. It has
+ * to sit inside the CC networks the admin set (gateway.networks), in either mode; in TUN mode also inside a network
+ * the server routes into the TUN device (helper/ccnix-tun-setup), in a table of their own that the host's own routes
+ * come before. So nothing an op does can take the host's LAN, its gateway or its way to the internet from it.
  */
 public final class OpRoutes {
     /** A route an op asked for, or why it can't be added. */
@@ -37,10 +37,10 @@ public final class OpRoutes {
 
     /**
      * line ("a.b.c.d/len via a.b.c.d") as a route an op may add to settings: no larger than /largest, behind a router
-     * on the gateway's network, not the gateway's own network, inside a network the server routes into the TUN
-     * device (tun), and not routed already.
+     * on the gateway's network, not the gateway's own network, inside one of the CC networks, in TUN mode (tun not
+     * null) inside a network the server routes into the TUN device, and not routed already.
      */
-    public static Check add(String line, Settings s, int largest, List<HostRoute> tun) {
+    public static Check add(String line, Settings s, int largest, List<NatConfig.Net> networks, List<HostRoute> tun) {
         var words = line.trim().split("\\s+");
         if (words.length != 3 || !words[1].equals("via")) return no("give it as a.b.c.d/len via a.b.c.d");
         var net = network(words[0]);
@@ -61,7 +61,12 @@ public final class OpRoutes {
         for (var r : s.routes()) {
             if (r.net() == ip && r.prefix() == len) return no(words[0] + " is routed already (" + r + "): del it first");
         }
-        if (tun.stream().noneMatch(t -> t.holds(ip, len))) {
+        if (networks.stream().noneMatch(n -> len >= n.len() && n.holds(ip))) {
+            return no(words[0] + " isn't inside the CC networks this gateway carries ("
+                + (networks.isEmpty() ? "none" : String.join(", ", networks.stream().map(NatConfig.Net::toString).toList()))
+                + "): the server's admin sets those (gateway.networks)");
+        }
+        if (tun != null && tun.stream().noneMatch(t -> t.holds(ip, len))) {
             return no("the server doesn't route " + words[0] + " into the TUN device, so nothing from outside would reach it"
                 + (tun.isEmpty() ? " (it routes nothing there)" : " (it routes " + String.join(", ", tun.stream().map(HostRoute::toString).toList()) + ")")
                 + ": the server's admin sets those");

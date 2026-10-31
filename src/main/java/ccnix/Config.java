@@ -1,5 +1,6 @@
 package ccnix;
 
+import ccnix.gateway.core.NatConfig;
 import ccnix.gateway.core.Settings;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
@@ -14,6 +15,20 @@ public final class Config {
     static {
         BUILDER.comment("The gateway on the CC network: the address CC routers route at, and the network it's on.").push("gateway");
     }
+
+    public static final ModConfigSpec.ConfigValue<String> MODE = BUILDER
+        .comment("How the gateway reaches the real network (the server admin's choice: not changed in game):",
+            "  \"nat\": in the server process, with no privileges or setup. CC computers reach the outside as the",
+            "         server itself (TCP and UDP; ping and traceroute stop at the gateway), and the outside reaches",
+            "         them only through [nat] forwards.",
+            "  \"tun\": through a TUN device on the server (Linux, set up as root: helper/ccnix-tun-setup), which",
+            "         routes: real addresses, ping, inbound traffic as the host's routing and firewall allow.")
+        .define("mode", "nat", o -> "nat".equals(o) || "tun".equals(o));
+
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> NETWORKS = BUILDER
+        .comment("The networks behind CC routers that the gateway carries, a.b.c.d/len. Every route (ops' too) must be",
+            "inside one. In TUN mode give helper/ccnix-tun-setup the same list.")
+        .defineListAllowEmpty("networks", List.of("10.1.0.0/16"), () -> "10.1.0.0/16", o -> o instanceof String);
 
     public static final ModConfigSpec.ConfigValue<String> ADDRESS = BUILDER
         .comment("The gateway's address and its network, a.b.c.d/len. Routers on the gateway's cable take addresses",
@@ -48,7 +63,61 @@ public final class Config {
         .defineInRange("opMaxSubnet", 16, 1, 32);
 
     static {
-        BUILDER.pop().comment("The helper that holds the TUN device (helper/ccnix-tun.c).").push("tun");
+        BUILDER.pop().comment("NAT mode. The limits and lists here apply only to CC computers' connections through a",
+            "Network Gateway, never to the server's own connections or its players'.").push("nat");
+    }
+
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> DENY = BUILDER
+        .comment("Where CC computers may not connect: a.b.c.d/len, a.b.c.d/len:port or a.b.c.d/len:lo-hi. By default",
+            "private, loopback, link-local (the cloud metadata service), carrier-grade NAT, multicast and reserved",
+            "addresses, and port 25 (mail) anywhere.")
+        .defineListAllowEmpty("deny", NatConfig.DEFAULT_DENY, () -> "192.168.0.0/16", o -> o instanceof String);
+
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> ALLOW = BUILDER
+        .comment("Exceptions to deny, in the same form: an allow rule wins (\"192.168.1.10/32:80\" lets CC computers",
+            "reach that one web server on the LAN).")
+        .defineListAllowEmpty("allow", List.of(), () -> "192.168.1.10/32:80", o -> o instanceof String);
+
+    public static final ModConfigSpec.IntValue MAX_PER_COMPUTER = BUILDER
+        .comment("Open TCP connections and UDP flows one CC computer may have through the gateway.")
+        .defineInRange("maxPerComputer", 16, 1, 4096);
+
+    public static final ModConfigSpec.IntValue MAX_TOTAL = BUILDER
+        .comment("Open TCP connections and UDP flows through the gateway in all.")
+        .defineInRange("maxTotal", 256, 1, 65536);
+
+    public static final ModConfigSpec.IntValue TCP_IDLE = BUILDER
+        .comment("Seconds a TCP connection may carry nothing before it's closed.")
+        .defineInRange("tcpIdle", 600, 10, 86400);
+
+    public static final ModConfigSpec.IntValue UDP_IDLE = BUILDER
+        .comment("Seconds a UDP flow may carry nothing before it's forgotten.")
+        .defineInRange("udpIdle", 60, 5, 86400);
+
+    public static final ModConfigSpec.ConfigValue<String> DNS_RELAY = BUILDER
+        .comment("Port 53 at the gateway's address (ip dns 10.0.0.1 on a CC computer):",
+            "  \"system\": relayed, unread, to the server's resolver (the first nameserver in /etc/resolv.conf); on",
+            "            Windows, which has none to relay to, answered from the Windows resolver (A and PTR)",
+            "  \"a.b.c.d\": relayed to that resolver",
+            "  \"\": off. DNS to any other address is never touched.")
+        .define("dnsRelay", "system");
+
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> FORWARDS = BUILDER
+        .comment("Ports on the server forwarded to CC computers: [\"25570/tcp -> 10.1.1.10:23\"]. The CC computer sees",
+            "the client's real address. Only in NAT mode: in TUN mode, forward with the host's firewall.")
+        .defineListAllowEmpty("forwards", List.of(), () -> "25570/tcp -> 10.1.1.10:23", o -> o instanceof String);
+
+    public static final ModConfigSpec.BooleanValue OP_FORWARDS = BUILDER
+        .comment("Ops may change the forwards in game (/ccnix forward add|del, permission level 3), on opForwardPorts only.")
+        .define("opForwards", false);
+
+    public static final ModConfigSpec.ConfigValue<String> OP_FORWARD_PORTS = BUILDER
+        .comment("The ports ops may forward, \"lo-hi\" or one port: the ones the host gave this server for it",
+            "(\"25570-25579\"). Empty: none.")
+        .define("opForwardPorts", "");
+
+    static {
+        BUILDER.pop().comment("TUN mode: the helper that holds the TUN device (helper/ccnix-tun.c).").push("tun");
     }
 
     public static final ModConfigSpec.ConfigValue<String> HELPER = BUILDER

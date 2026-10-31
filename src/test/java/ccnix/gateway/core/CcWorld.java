@@ -23,6 +23,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.function.BooleanSupplier;
 
 /**
  * CC computers running ccnix's lib/net in Cobalt (CC's Lua VM), cables between them, a gateway on one cable,
@@ -34,6 +36,10 @@ import java.util.Map;
  * The kernel owns the gateway's address (it answers ping there), sends anything else in 10.0.0.0/8 back into the
  * TUN device (a server routing CC's networks to each other), and keeps the rest in {@link #outside} for the test
  * to look at, as if it went out to a real network.
+ * <p>
+ * Or, built with a {@link NatConfig}, NAT mode: {@link Nat} is the gateway's other side, with real sockets
+ * ({@link #outside(Outside)} decides which); their events wait in a queue that {@link #settle()} runs, so the test's
+ * thread is the gateway's, as in the mod.
  */
 final class CcWorld {
     static final long GATEWAY = Ipv4.parseIp("10.0.0.1");
@@ -56,8 +62,16 @@ final class CcWorld {
     private final Map<Object, String> wireOf = new HashMap<>();
     private final ArrayDeque<Sent> fromGateway = new ArrayDeque<>();
     private final ArrayDeque<byte[]> toKernel = new ArrayDeque<>();
+    private final ArrayDeque<byte[]> fromNat = new ArrayDeque<>();
+    final ConcurrentLinkedQueue<Runnable> posted = new ConcurrentLinkedQueue<>();
+    final Nat nat;
 
     CcWorld(Settings settings) throws Exception {
+        this(settings, null, null);
+    }
+
+    /** NAT mode, on outside (null: JavaOutside, whose events are posted here). */
+    CcWorld(Settings settings, NatConfig cfg, java.util.function.Function<Outside, Outside> wrap) throws Exception {
         CoreLibraries.standardGlobals(state);
         var netPath = System.getProperty("ccnix.net");
         if (netPath == null || !Files.exists(Path.of(netPath))) {
@@ -68,7 +82,15 @@ final class CcWorld {
         harness = (LuaTable) LuaThread.runMain(state, load(getClass().getResourceAsStream("harness.lua"), "@harness.lua"),
             net).first();
         state.globals().rawset("H", harness);
-        gateway = new Gateway(settings, toKernel::add, () -> Math.round(now * 1000));
+        if (cfg == null) {
+            nat = null;
+            gateway = new Gateway(settings, toKernel::add, () -> Math.round(now * 1000));
+        } else {
+            Outside real = new ccnix.gateway.JavaOutside(posted::add);
+            nat = new Nat(settings, cfg, wrap == null ? real : wrap.apply(real), () -> Math.round(now * 1000));
+            gateway = new Gateway(settings, nat, () -> Math.round(now * 1000));
+            nat.attach(fromNat::add);
+        }
     }
 
     private LuaFunction load(InputStream in, String name) throws Exception {
@@ -150,16 +172,42 @@ final class CcWorld {
             now = Math.min(end, now + 0.05);
             call("tick", ValueFactory.valueOf(now));
             gateway.tick();
+            if (nat != null) nat.tick();
             settle();
         }
+    }
+
+    /**
+     * NAT mode: let real time pass (for the sockets) as well as the test's (10 ms of it for every 2 ms real), until done
+     * says so or seconds of real time have gone. False if it never did.
+     */
+    boolean until(BooleanSupplier done, double seconds) {
+        long end = System.nanoTime() + (long) (seconds * 1e9);
+        while (System.nanoTime() < end) {
+            settle();
+            if (done.getAsBoolean()) return true;
+            try {
+                Thread.sleep(2);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+            pump(0.01);
+        }
+        settle();
+        return done.getAsBoolean();
     }
 
     /** Carry everything waiting, until nothing is. */
     void settle() {
         for (int round = 0; round < 10_000; round++) {
             var sent = (LuaTable) call("take").first();
-            boolean any = sent.length() > 0 || !fromGateway.isEmpty() || !toKernel.isEmpty();
+            boolean any = sent.length() > 0 || !fromGateway.isEmpty() || !toKernel.isEmpty() || !fromNat.isEmpty()
+                || !posted.isEmpty();
             if (!any) return;
+            Runnable task;
+            while ((task = posted.poll()) != null) task.run();
+            while (!fromNat.isEmpty()) gateway.fromTun(fromNat.poll());
             for (int i = 1; i <= sent.length(); i++) {
                 var s = (LuaTable) sent.rawget(i);
                 var from = new Endpoint(s.rawget(1).toInteger(), s.rawget(2).toString());
