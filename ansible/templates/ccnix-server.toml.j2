@@ -1,10 +1,24 @@
 [gateway]
+	mode = "{{ ccnix_gateway_mode }}"
+	networks = [{{ ccnix_cc_networks | map('to_json') | join(', ') }}]
 	address = "{{ ccnix_gateway_address }}"
 	channel = {{ ccnix_gateway_channel }}
 	mac = "{{ ccnix_gateway_mac }}"
 	routes = [{{ ccnix_gateway_routes | map('to_json') | join(', ') }}]
 	opRoutes = {{ ccnix_op_routes | bool | lower }}
 	opMaxSubnet = {{ ccnix_op_route_max_subnet }}
+
+[nat]
+	deny = [{{ ccnix_nat_deny | map('to_json') | join(', ') }}]
+	allow = [{{ ccnix_nat_allow | map('to_json') | join(', ') }}]
+	maxPerComputer = {{ ccnix_nat_max_per_computer }}
+	maxTotal = {{ ccnix_nat_max_total }}
+	tcpIdle = {{ ccnix_nat_tcp_idle }}
+	udpIdle = {{ ccnix_nat_udp_idle }}
+	dnsRelay = "{{ ccnix_nat_dns_relay }}"
+	forwards = [{{ ccnix_nat_forwards | map('to_json') | join(', ') }}]
+	opForwards = {{ ccnix_nat_op_forwards | bool | lower }}
+	opForwardPorts = "{{ ccnix_nat_op_forward_ports }}"
 
 [tun]
 	helper = "ccnix-tun"

@@ -12,6 +12,11 @@ booted to "Done" with ccnix in it before this was written.
 Where it says **desktop**, that's Git Bash on Windows; **VM** is a root
 shell unless it says `minecraft`.
 
+This runs the gateway in **TUN mode** (a TUN device on the VM, real
+routing). The mod's default is **NAT mode**, which needs none of section
+3's device: set `ccnix_gateway_mode: nat` (or `mode = "nat"` in section
+6) and skip it; the mod's README compares the two.
+
 **Sections 3, 4 and 6 are automated** by [../ansible/](../ansible/README.md):
 after section 2's bundle, `ansible/run-on-host.sh` (or `ansible-playbook
 site.yml`) does them, with the server as the `minecraft` service
@@ -36,7 +41,7 @@ list shows 1.120.2). So:
    ```sh
    # desktop
    cd ~/Projects/ccnix-mod && git pull && ./gradlew build
-   cp build/libs/ccnix-0.2.0.jar "<your CurseForge instance folder>/mods/"
+   cp build/libs/ccnix-0.3.0.jar "<your CurseForge instance folder>/mods/"
    ```
 
 After a pack update, check the Mods screen (title screen → Mods → CC:
@@ -59,7 +64,7 @@ cd ~/Projects/ccnix-mod
 helper/server-bundle.sh "<your CurseForge instance folder>" server-bundle.tar.gz
 #   left out: cc-tweaked-1.21.1-forge-1.113.1.jar (CC: Tweaked older than 1.120)
 #   left out: sodium-neoforge-0.8.13+mc1.21.1.jar (client-only)
-#   server-bundle.tar.gz: 125 mods, with ccnix-0.2.0.jar
+#   server-bundle.tar.gz: 125 mods, with ccnix-0.3.0.jar
 scp server-bundle.tar.gz helper/ccnix-tun.c helper/ccnix-tun-setup root@<vm>:/root/
 ```
 
@@ -199,12 +204,15 @@ the server runs.
 
 ```toml
 [gateway]
+    mode = "tun"                               # the VM's TUN device (section 3)
+    networks = ["10.1.0.0/16"]                 # the CC networks: routes must be inside
     address = "10.0.0.1/24"
     channel = 4040
     mac = "gateway"
     routes = ["10.1.0.0/16 via 10.0.0.2"]      # the CC router below
     opRoutes = true                            # ops may /ccnix route add|del
     opMaxSubnet = 16                           # a /16 at most
+[nat]                                          # NAT mode only: the mod writes the defaults
 [tun]
     helper = "ccnix-tun"
     device = "ccnix0"

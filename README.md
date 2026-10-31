@@ -6,9 +6,10 @@ A Minecraft mod (NeoForge 1.21.1, with CC: Tweaked) with two parts:
   shell `ccsh`, the POSIX utilities, `git`, the network stack, `init` and the services, telnet, and the turtle
   programs. They're on the path at every boot, with nothing to install. Each computer can pull updates over its ROM
   with `ccnix update`, and the server's ops update the ROM itself with `/ccnix rom update`.
-- **The Network Gateway.** A block on CC cables that joins ComputerCraft's wired network to a real one through a TUN
-  device on the server. A real machine can `telnet` to a CC computer running `telnetd`, `ping` it, or `nc` to it, and
-  a CC computer can reach anything the server can reach.
+- **The Network Gateway.** A block on CC cables that joins ComputerCraft's wired network to a real one: in NAT mode
+  (the default) from inside the server process, with nothing to set up, so CC computers reach the internet as the
+  server does and the outside reaches them through port forwards; or in TUN mode through a TUN device on a Linux
+  server, which routes, so a real machine can `telnet` to a CC computer, `ping` it, or `nc` to it.
 
 ## The ROM
 
@@ -65,6 +66,48 @@ fetches it into `/ccnix`, as it does any file the ROM lacks.
 
 ## The Network Gateway
 
+The gateway joins CC's wired network to the real one, in one of two modes, the server admin's choice
+(`gateway.mode` in the config; [ADR-0002](https://github.com/djt-code/ccnix/blob/main/doc/adr/0002-nat-mode-gateway.md)):
+
+| | **NAT** (the default) | **TUN** |
+|---|---|---|
+| Runs | in the server process: no privileges, helper or setup; any OS, a container, singleplayer | through a TUN device on a Linux server, set up as root |
+| CC to the outside | TCP and UDP, as the server's own connections | routed, with real addresses (`FORWARD`, `NAT` on the host) |
+| ping, traceroute past the gateway | no: the gateway says "net unreachable" | yes |
+| The outside to CC | only through port forwards (`nat.forwards`, ops' if allowed) | routed, as the host's routing and firewall allow |
+| Protection | a deny list and limits for CC computers' connections, on by default | the host's firewall |
+| DNS at the gateway's address | relayed to the server's resolver (on Windows, answered from it) | whatever the host serves there |
+
+Either way the gateway is transport only: it carries IP, TCP and UDP and never reads what's inside (the Windows DNS
+answer is the one exception). Programs on the computers do everything above that.
+
+### NAT mode
+
+Nothing to set up: place a gateway and route at it. CC computers' connections to the outside become the server's
+own (Java sockets), carried byte for byte, and the gateway answers ping at its address. What's in `[nat]`:
+
+- **Protection** (applies only to CC computers' connections through a gateway, never to the server's own or its
+  players'): `deny` blocks private, loopback, link-local (the cloud metadata service), carrier-grade NAT,
+  multicast and reserved addresses, and port 25 anywhere; `allow` makes exceptions; `maxPerComputer` (16) and
+  `maxTotal` (256) cap open connections and flows; `tcpIdle` (600 s) and `udpIdle` (60 s) close quiet ones. A
+  refused TCP connection gets a reset, a refused datagram "port unreachable".
+- **DNS:** `dnsRelay = "system"` relays port 53 at the gateway's address, unread, to the first `nameserver` in
+  `/etc/resolv.conf`, so `ip dns 10.0.0.1` works on a host that blocks outbound DNS. On Windows, which has no such
+  file, the gateway answers A and PTR questions from the Windows resolver instead. An address relays there; `""`
+  turns it off. DNS sent to any other address is never touched.
+- **Port forwards:** `forwards = ["25570/tcp -> 10.1.1.10:23"]` listens on the server's port and connects to the CC
+  computer, which sees the client's real address (a client on the server's own loopback shows as the gateway's). UDP
+  too. With `opForwards`, ops change them in game, on the ports in `opForwardPorts` only (`"25570-25579"`: the
+  ones the host gave the server):
+
+  ```
+  /ccnix forward                                 the forwards, and the ports ops may use
+  /ccnix forward add 25571 10.1.1.10:23          (or 25571/udp)
+  /ccnix forward del 25571
+  ```
+
+### TUN mode
+
 ```
  CC host 10.0.0.5 ─┐
                    ├─ cable ─ [Network Gateway] ··· ccnix-tun ─ ccnix0 (10.0.0.1) ─ the server's kernel ─ eth0
@@ -72,7 +115,7 @@ fetches it into `/ccnix`, as it does any file the ROM lacks.
    └ 10.1.0.0/16 behind it   channel 4040         no privileges)
 ```
 
-### How it works
+#### How it works
 
 The **gateway** is the server's link onto the CC network, and the **server** is the router:
 
@@ -96,9 +139,9 @@ The **gateway** is the server's link onto the CC network, and the **server** is 
   Minecraft server needs no privileges. The helper needs none either, once the device belongs to the server's user.
   The helper starts with the first gateway block loaded, so a world without one runs no helper.
 
-### Setting up a server
+#### Setting up a server
 
-The server has to be Linux, for the TUN device. [doc/ubuntu-server.md](doc/ubuntu-server.md) walks through a
+The server has to be Linux, for the TUN device. Set `gateway.mode = "tun"`. [doc/ubuntu-server.md](doc/ubuntu-server.md) walks through a
 fresh Ubuntu VM with the dma.space modpack, your CurseForge client, and the gateway with a CC router and a VLAN behind
 it, end to end.
 
@@ -134,7 +177,7 @@ it, end to end.
    Type=oneshot
    RemainAfterExit=yes
    Environment=NAT=eth0
-   ExecStart=/usr/local/sbin/ccnix-tun-setup minecraft 10.0.0.1/24 10.0.0.0/8
+   ExecStart=/usr/local/sbin/ccnix-tun-setup minecraft 10.0.0.1/24 10.1.0.0/16
 
    [Install]
    WantedBy=multi-user.target
@@ -148,25 +191,29 @@ it, end to end.
 
    | Key | Default | What |
    |---|---|---|
-   | `gateway.address` | `10.0.0.1/24` | The gateway's address and its network. Use the device's address. |
+   | `gateway.mode` | `nat` | `nat` or `tun` (above). |
+   | `gateway.networks` | `["10.1.0.0/16"]` | The CC networks behind routers that the gateway carries; every route must be inside one. In TUN mode, give `ccnix-tun-setup` the same. |
+   | `gateway.address` | `10.0.0.1/24` | The gateway's address and its network. In TUN mode, use the device's address. |
    | `gateway.channel` | `4040` | The modem channel: 4040 is ccnix's untagged network, 4040 + n is VLAN n. |
    | `gateway.mac` | `gateway` | Its MAC on the CC network. |
    | `gateway.routes` | `[]` | Networks behind CC routers: `["10.1.0.0/16 via 10.0.0.2"]`. The longest match wins. |
    | `gateway.opRoutes` | `false` | Ops may change the routes in game (`/ccnix route add\|del`). |
    | `gateway.opMaxSubnet` | `16` | The largest network an op may route, as a prefix length: 16 allows a /16 or smaller. |
+   | `nat.*` | | NAT mode: `deny`, `allow`, `maxPerComputer`, `maxTotal`, `tcpIdle`, `udpIdle`, `dnsRelay`, `forwards`, `opForwards`, `opForwardPorts` (above). |
    | `tun.helper` | `ccnix-tun` | The helper, with any arguments before the device's name. |
    | `tun.device` | `ccnix0` | The TUN device. |
 
 5. **Place a Network Gateway** and cable it to CC routers' wired modems. It's crafted from a full wired modem, iron,
    stone and redstone, and found in the Functional Blocks tab. `/ccnix` (operators) shows the gateway too:
-   - its address, routes and blocks;
+   - its mode, address, routes and blocks;
    - the neighbours it knows;
    - packets carried and dropped;
    - the helper's state.
 
    The server log has the helper's messages.
 
-6. **Routes in game.** `/ccnix route` shows the gateway's routes and the server's routes into the device. With
+6. **Routes in game** (either mode). `/ccnix route` shows the gateway's routes, its CC networks, and in TUN mode
+   the server's routes into the device. With
    `gateway.opRoutes` on, ops (permission level 3) change them while the server runs, and the change is saved in the
    config:
 
@@ -176,9 +223,9 @@ it, end to end.
    ```
 
    A route an op adds has to be a network's own address, no larger than `gateway.opMaxSubnet`, behind a router on
-   the gateway's network, clear of the gateway's own network, and inside a network the server routes into the
-   device. It only tells the gateway which CC router has that network: nothing an op does reaches the server's own
-   routing, and no part of the game needs root.
+   the gateway's network, clear of the gateway's own network, inside `gateway.networks`, and in TUN mode inside a
+   network the server routes into the device. It only tells the gateway which CC router has that network: nothing an
+   op does reaches the server's own routing, and no part of the game needs root.
 
 ### On the CC side
 
@@ -195,10 +242,12 @@ Hosts behind it route at it (`ip route add default via 10.1.0.1`). The gateway n
 `routes = ["10.1.0.0/16 via 10.0.0.2"]`. A host can also sit on the gateway's network itself, with
 `ip route add default via 10.0.0.1`.
 
-From the server, `telnet 10.1.0.6` reaches a CC computer running `telnetd`. Other machines reach CC's networks in one
-of two ways:
+In TUN mode, `telnet 10.1.0.6` from the server reaches a CC computer running `telnetd`. Other machines reach CC's
+networks in one of two ways:
 - through the server, with a route to them on your real router and `FORWARD=1`;
 - or only outbound, with `NAT`.
+
+In NAT mode, the outside reaches a CC computer through a port forward: `telnet <server> 25571`.
 
 ## Building and testing
 
@@ -223,6 +272,9 @@ clone. With the submodule not checked out, the build uses the ccnix repo this is
   - **End to end:** CC computers ping, TCP and UDP to each other through the gateway and a fake kernel. A scripted
     "real" client then connects to a CC listener the way Linux would: its SYN options, sequence numbers wrapping
     past 2^32, binary data, both halves of the close, a refused port, ping, and an ICMP port unreachable.
+  - **NAT mode:** CC computers through the gateway and NAT to real sockets on loopback: TCP both ways and closed in
+    order, a refused port, UDP, the deny list and limits, idle connections, TCP and UDP forwards (the client's
+    address), the DNS relay (and a query to another resolver left alone), the Windows answer; ops' forward checks.
 
 `./gradlew runServer` runs a dev server with CC: Tweaked in `run/`.
 
@@ -230,6 +282,7 @@ clone. With the submodule not checked out, the build uses the ccnix repo this is
 
 - **Files deleted upstream** stay in the ROM, under a computer's updates, until the server's copy catches up.
 - **No DHCP:** routers' addresses are set by hand.
-- **No ICMP errors from the gateway itself.** A packet it can't deliver is just dropped. The gateway shares the
-  server's address, and the server would refuse an ICMP from its own address.
+- **No ICMP errors from the gateway itself in TUN mode.** A packet it can't deliver is just dropped. The gateway
+  shares the server's address, and the server would refuse an ICMP from its own address. (NAT mode sends its own:
+  net and port unreachable, time exceeded.)
 - **IPv4 only**, and one gateway per server.

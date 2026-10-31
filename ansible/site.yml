@@ -28,7 +28,8 @@
         shell: /usr/sbin/nologin
         create_home: true
 
-    # The gateway's helper and the TUN device it holds
+    # The gateway's helper and the TUN device it holds (TUN mode; in NAT
+    # mode the device is taken down and the unit left disabled)
     - name: Helper source
       ansible.builtin.copy:
         src: ../helper/ccnix-tun.c
@@ -55,12 +56,30 @@
         mode: "0644"
       notify: Restart ccnix-tun
 
-    - name: The TUN device, now and at every boot
+    - name: The TUN device, now and at every boot (TUN mode)
       ansible.builtin.systemd_service:
         name: ccnix-tun
         enabled: true
         state: started
         daemon_reload: true
+      when: ccnix_gateway_mode == "tun"
+
+    - name: No TUN device (NAT mode)
+      ansible.builtin.systemd_service:
+        name: ccnix-tun
+        enabled: false
+        state: stopped
+        daemon_reload: true
+      when: ccnix_gateway_mode == "nat"
+
+    - name: The device, its table and rules taken down (NAT mode)
+      ansible.builtin.command:
+        cmd: /usr/local/sbin/ccnix-tun-setup --remove
+        removes: "/sys/class/net/{{ ccnix_tun_device }}"
+      environment:
+        DEVICE: "{{ ccnix_tun_device }}"
+        TABLE: "{{ ccnix_tun_table }}"
+      when: ccnix_gateway_mode == "nat"
 
     # NeoForge
     - name: Server folder
@@ -130,26 +149,46 @@
         mode: "0644"
         force: false
 
+    - name: The config's sections, for keys a newer mod adds
+      ansible.builtin.lineinfile:
+        path: "{{ minecraft_dir }}/config/ccnix-server.toml"
+        line: "[nat]"
+        insertbefore: "^\\[tun\\]"
+
     - name: The gateway's settings
       ansible.builtin.lineinfile:
         path: "{{ minecraft_dir }}/config/ccnix-server.toml"
         regexp: "^\\s*{{ item.key }} = "
         line: "\t{{ item.key }} = {{ item.value }}"
         insertafter: "^\\[{{ item.section }}\\]"      # (a key the file doesn't have yet: in its section)
-      loop: "{{ ccnix_settings + (ccnix_routes if ccnix_ansible_routes | bool else []) }}"
+      loop: "{{ ccnix_settings + (ccnix_routes if ccnix_ansible_routes | bool else [])
+        + (ccnix_forwards if ccnix_ansible_forwards | bool else []) }}"
       loop_control:
         label: "{{ item.key }}"
       vars:
         ccnix_settings:
+          - { section: gateway, key: mode, value: '"{{ ccnix_gateway_mode }}"' }
+          - { section: gateway, key: networks, value: "[{{ ccnix_cc_networks | map('to_json') | join(', ') }}]" }
           - { section: gateway, key: address, value: '"{{ ccnix_gateway_address }}"' }
           - { section: gateway, key: channel, value: "{{ ccnix_gateway_channel }}" }
           - { section: gateway, key: mac, value: '"{{ ccnix_gateway_mac }}"' }
           - { section: gateway, key: opRoutes, value: "{{ ccnix_op_routes | bool | lower }}" }
           - { section: gateway, key: opMaxSubnet, value: "{{ ccnix_op_route_max_subnet }}" }
+          - { section: nat, key: deny, value: "[{{ ccnix_nat_deny | map('to_json') | join(', ') }}]" }
+          - { section: nat, key: allow, value: "[{{ ccnix_nat_allow | map('to_json') | join(', ') }}]" }
+          - { section: nat, key: maxPerComputer, value: "{{ ccnix_nat_max_per_computer }}" }
+          - { section: nat, key: maxTotal, value: "{{ ccnix_nat_max_total }}" }
+          - { section: nat, key: tcpIdle, value: "{{ ccnix_nat_tcp_idle }}" }
+          - { section: nat, key: udpIdle, value: "{{ ccnix_nat_udp_idle }}" }
+          - { section: nat, key: dnsRelay, value: '"{{ ccnix_nat_dns_relay }}"' }
+          - { section: nat, key: opForwards, value: "{{ ccnix_nat_op_forwards | bool | lower }}" }
+          - { section: nat, key: opForwardPorts, value: '"{{ ccnix_nat_op_forward_ports }}"' }
           - { section: tun, key: helper, value: '"ccnix-tun"' }
           - { section: tun, key: device, value: '"{{ ccnix_tun_device }}"' }
         ccnix_routes:
           - { section: gateway, key: routes, value: "[{{ ccnix_gateway_routes | map('to_json') | join(', ') }}]" }
+        ccnix_forwards:
+          - { section: nat, key: forwards, value: "[{{ ccnix_nat_forwards | map('to_json') | join(', ') }}]" }
 
     - name: eula.txt
       ansible.builtin.copy:
@@ -227,6 +266,7 @@
         name: ccnix-tun
         state: restarted
         daemon_reload: true
+      when: ccnix_gateway_mode == "tun"
 
     - name: Restart minecraft
       ansible.builtin.systemd_service:

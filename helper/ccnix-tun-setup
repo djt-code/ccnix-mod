@@ -3,15 +3,16 @@
 # attaches to.  Run it as root, once a boot (a systemd unit, rc.local).
 #
 #   ccnix-tun-setup USER [ADDRESS/LEN [NETWORK/LEN...]]
+#   ccnix-tun-setup --remove       take it all down (the gateway in NAT mode)
 #
 #   USER      the user the Minecraft server runs as: the device is theirs,
 #             so ccnix-tun needs no privileges
 #   ADDRESS   the server's address on the device: the gateway's address in
 #             the mod's config (10.0.0.1/24 unless you changed it), so
 #             packets CC sends to the gateway reach the server
-#   NETWORK   CC's networks behind CC routers (or one holding them all,
-#             10.0.0.0/8): the server sends their packets into the device.
-#             The gateway's routes, ops' included, have to be inside these.
+#   NETWORK   CC's networks behind CC routers (the mod's gateway.networks):
+#             the server sends their packets into the device. The gateway's
+#             routes, ops' included, have to be inside these.
 #
 # The networks go in a routing table of their own, TABLE, looked at after
 # the host's own routes (all but its default route: the rule "lookup main
@@ -29,14 +30,24 @@
 #                   the real network needn't know about them (FORWARD too)
 #
 #   ccnix-tun-setup minecraft 10.0.0.1/24 10.1.0.0/16
-#   NAT=eth0 ccnix-tun-setup minecraft 10.0.0.1/24 10.0.0.0/8
+#   NAT=eth0 ccnix-tun-setup minecraft 10.0.0.1/24 10.1.0.0/16 10.2.0.0/16
 #
 # Running it again leaves things as it says, whatever was there before.
 set -e
 
 if [ $# -lt 1 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-    sed -n '2,32s/^# \{0,1\}//p' "$0"
+    sed -n '2,35s/^# \{0,1\}//p' "$0"
     exit 2
+fi
+if [ "$1" = "--remove" ]; then
+    dev=${DEVICE:-ccnix0}
+    table=${TABLE:-4040}
+    ip link del "$dev" 2>/dev/null || true
+    ip route flush table "$table" 2>/dev/null || true
+    while ip rule del pref "$table" 2>/dev/null; do :; done
+    while ip rule del pref $((table + 1)) 2>/dev/null; do :; done
+    echo "$dev: removed, with table $table and its rules (forwarding and masquerading left as they were)"
+    exit 0
 fi
 user=$1
 addr=${2:-10.0.0.1/24}

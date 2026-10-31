@@ -22,25 +22,51 @@ server_properties:
 # config/, defaultconfigs/.  Pass -e ccnix_bundle=... or set it here.
 ccnix_bundle: "{{ playbook_dir }}/../server-bundle.tar.gz"
 
-# The Network Gateway (config/ccnix-server.toml) and the TUN device under it
+# The Network Gateway (config/ccnix-server.toml)
+# The mode: "tun" (a TUN device on this host, set up below: real routing,
+# ping, inbound as the host's firewall allows) or "nat" (in the server
+# process, no host setup; outbound TCP/UDP only, inbound through forwards).
+# The mod's own default is nat; this host has the TUN device, so tun.
+ccnix_gateway_mode: tun
 ccnix_gateway_address: 10.0.0.1/24
 ccnix_gateway_channel: 4040
 ccnix_gateway_mac: gateway
 ccnix_gateway_routes: ["10.1.0.0/16 via 10.0.0.2"]   # CC networks behind CC routers
+# The CC networks the gateway carries, in both modes (gateway.networks):
+# every gateway route, ops' too, has to be inside one.  In TUN mode they're
+# routed into the device, in a routing table of their own (ccnix_tun_table)
+# that the host's own routes come before.
+ccnix_cc_networks: ["10.1.0.0/16"]
 ccnix_tun_device: ccnix0
-# Routed into the device on the server, in a routing table of their own
-# (ccnix_tun_table) that the host's own routes come before.  Every gateway
-# route, ops' too, has to be inside one of these.
-ccnix_tun_networks: ["10.1.0.0/16"]
 ccnix_tun_table: 4040
 ccnix_forward: true             # the server routes between CC's networks and its LAN
 ccnix_nat: ""                   # an uplink name (eth0) to masquerade CC's networks out of it
 
 # Who owns the gateway's routes.  ccnix_op_routes: ops may change them in
-# game (/ccnix route add|del), within ccnix_tun_networks and no larger
+# game (/ccnix route add|del), within ccnix_cc_networks and no larger
 # than a /ccnix_op_route_max_subnet.  ccnix_ansible_routes: every run sets
 # them to ccnix_gateway_routes, replacing what ops changed; off, the play
 # writes them only into a new config and leaves them alone after.
 ccnix_op_routes: true
 ccnix_op_route_max_subnet: 16
 ccnix_ansible_routes: false
+
+# NAT mode ([nat]).  The policy and limits apply only to CC computers'
+# connections through a Network Gateway, never to the server's or players'.
+ccnix_nat_deny: ["0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16",
+                 "172.16.0.0/12", "192.168.0.0/16", "224.0.0.0/4", "240.0.0.0/4", "0.0.0.0/0:25"]
+ccnix_nat_allow: []             # exceptions to deny: "192.168.1.10/32:80"
+ccnix_nat_max_per_computer: 16
+ccnix_nat_max_total: 256
+ccnix_nat_tcp_idle: 600         # seconds
+ccnix_nat_udp_idle: 60
+ccnix_nat_dns_relay: system     # port 53 at the gateway: system (resolv.conf), an address, or "" (off)
+# Port forwards ("25570/tcp -> 10.1.1.10:23"), NAT mode only.  As with
+# routes: ccnix_nat_op_forwards lets ops change them in game, only on
+# ccnix_nat_op_forward_ports ("25570-25579": ports the host gives the
+# server; "" none); ccnix_ansible_forwards makes every run set them to
+# ccnix_nat_forwards.
+ccnix_nat_forwards: []
+ccnix_nat_op_forwards: false
+ccnix_nat_op_forward_ports: ""
+ccnix_ansible_forwards: false

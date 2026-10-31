@@ -14,7 +14,7 @@ Environment=FORWARD=1
 {% if ccnix_nat %}
 Environment=NAT={{ ccnix_nat }}
 {% endif %}
-ExecStart=/usr/local/sbin/ccnix-tun-setup {{ minecraft_user }} {{ ccnix_gateway_address }} {{ ccnix_tun_networks | join(' ') }}
+ExecStart=/usr/local/sbin/ccnix-tun-setup {{ minecraft_user }} {{ ccnix_gateway_address }} {{ ccnix_cc_networks | join(' ') }}
 
 [Install]
 WantedBy=multi-user.target
