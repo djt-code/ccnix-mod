@@ -197,7 +197,7 @@ it, end to end.
    | `gateway.channel` | `4040` | The modem channel: 4040 is ccnix's untagged network, 4040 + n is VLAN n. |
    | `gateway.mac` | `gateway` | Its MAC on the CC network. |
    | `gateway.routes` | `[]` | Networks behind CC routers: `["10.1.0.0/16 via 10.0.0.2"]`. The longest match wins. |
-   | `gateway.opRoutes` | `false` | Ops may change the routes in game (`/ccnix route add\|del`). |
+   | `gateway.opRoutes` | `false` | Ops may change the routes in game (`/ccnix route add\|del`). Always on in singleplayer, where the player is the admin. |
    | `gateway.opMaxSubnet` | `16` | The largest network an op may route, as a prefix length: 16 allows a /16 or smaller. |
    | `nat.*` | | NAT mode: `deny`, `allow`, `maxPerComputer`, `maxTotal`, `tcpIdle`, `udpIdle`, `dnsRelay`, `forwards`, `opForwards`, `opForwardPorts` (above). |
    | `tun.helper` | `ccnix-tun` | The helper, with any arguments before the device's name. |

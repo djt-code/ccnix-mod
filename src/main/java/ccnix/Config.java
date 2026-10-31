@@ -55,7 +55,7 @@ public final class Config {
     public static final ModConfigSpec.BooleanValue OP_ROUTES = BUILDER
         .comment("Ops may change the routes in game: /ccnix route add <net/len> via <router>, /ccnix route del <net/len>",
             "(permission level 3). Only inside the networks the server routes into the TUN device, so nothing an op",
-            "adds reaches the server's own routing.")
+            "adds reaches the server's own routing. Always allowed in singleplayer, whatever this says.")
         .define("opRoutes", false);
 
     public static final ModConfigSpec.IntValue OP_MAX_SUBNET = BUILDER

@@ -36,7 +36,7 @@ import static net.minecraft.commands.Commands.literal;
  * <pre>
  *   /ccnix                                  the ROM, then the gateway
  *   /ccnix route                            the gateway's routes, and in TUN mode the server's into the device
- *   /ccnix route add &lt;net/len&gt; via &lt;router&gt;  (gateway.opRoutes, and no larger than gateway.opMaxSubnet)
+ *   /ccnix route add &lt;net/len&gt; via &lt;router&gt;  (gateway.opRoutes or singleplayer, no larger than gateway.opMaxSubnet)
  *   /ccnix route del &lt;net/len&gt;
  *   /ccnix forward                          the port forwards, and the ports ops may forward
  *   /ccnix forward add &lt;port&gt;[/udp] &lt;a.b.c.d&gt;:&lt;port&gt;   (NAT mode, nat.opForwards, on nat.opForwardPorts)
@@ -57,7 +57,7 @@ final class CcnixCommand {
         dispatcher.register(literal("ccnix").requires(s -> s.hasPermission(2))
             .executes(ctx -> say(ctx, status()))
             .then(literal("route")
-                .executes(ctx -> say(ctx, routes()))
+                .executes(ctx -> say(ctx, routes(ctx.getSource())))
                 .then(literal("add").requires(s -> s.hasPermission(OPS))
                     .then(argument("route", greedyString()).executes(ctx -> addRoute(ctx.getSource(), getString(ctx, "route")))))
                 .then(literal("del").requires(s -> s.hasPermission(OPS))
@@ -109,11 +109,16 @@ final class CcnixCommand {
     // Routes
     // ---------------------------------------------------------------------------------------------------------------
 
-    private static List<String> routes() {
+    /** gateway.opRoutes, or always in singleplayer, where the player is the server's admin. */
+    private static boolean opRoutes(CommandSourceStack src) {
+        return Config.OP_ROUTES.get() || !src.getServer().isDedicatedServer();
+    }
+
+    private static List<String> routes(CommandSourceStack src) {
         var out = new ArrayList<String>();
         var s = Service.settings();
         out.add("gateway " + s.address() + ": " + (s.routes().isEmpty() ? "no routes" : s.routes().size() + " route"
-            + (s.routes().size() == 1 ? "" : "s")) + (Config.OP_ROUTES.get()
+            + (s.routes().size() == 1 ? "" : "s")) + (opRoutes(src)
             ? " (ops may change them, a /" + Config.OP_MAX_SUBNET.get() + " at most: /ccnix route add|del)"
             : " (ops can't change them: gateway.opRoutes)"));
         for (var r : s.routes()) out.add("  " + r);
@@ -131,7 +136,7 @@ final class CcnixCommand {
     }
 
     private static int addRoute(CommandSourceStack src, String line) {
-        if (!Config.OP_ROUTES.get()) return fail(src, "Ops can't change the gateway's routes on this server (gateway.opRoutes)");
+        if (!opRoutes(src)) return fail(src, "Ops can't change the gateway's routes on this server (gateway.opRoutes)");
         List<OpRoutes.HostRoute> host = null;
         if (Service.mode().equals("tun")) {
             try {
@@ -151,7 +156,7 @@ final class CcnixCommand {
     }
 
     private static int delRoute(CommandSourceStack src, String network) {
-        if (!Config.OP_ROUTES.get()) return fail(src, "Ops can't change the gateway's routes on this server (gateway.opRoutes)");
+        if (!opRoutes(src)) return fail(src, "Ops can't change the gateway's routes on this server (gateway.opRoutes)");
         var net = OpRoutes.network(network.trim());
         if (net.problem() != null) return fail(src, net.problem());
         var list = new ArrayList<String>();
