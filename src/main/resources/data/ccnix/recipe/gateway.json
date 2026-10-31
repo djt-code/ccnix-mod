@@ -2,15 +2,15 @@
   "type": "minecraft:crafting_shaped",
   "category": "redstone",
   "pattern": [
-    "SIS",
-    "IMI",
-    "SRS"
+    "SGS",
+    "GMG",
+    "SES"
   ],
   "key": {
     "S": { "item": "minecraft:stone" },
-    "I": { "item": "minecraft:iron_ingot" },
+    "G": { "item": "minecraft:gold_ingot" },
     "M": { "item": "computercraft:wired_modem_full" },
-    "R": { "item": "minecraft:redstone" }
+    "E": { "item": "minecraft:ender_eye" }
   },
   "result": { "id": "ccnix:gateway", "count": 1 }
 }

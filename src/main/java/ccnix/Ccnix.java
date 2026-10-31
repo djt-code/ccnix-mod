@@ -60,7 +60,7 @@ public final class Ccnix {
         container.registerConfig(ModConfig.Type.SERVER, Config.SPEC);
 
         bus.addListener((RegisterCapabilitiesEvent e) ->
-            e.registerBlockEntity(WiredElementCapability.get(), GATEWAY_ENTITY.get(), (be, side) -> be.element()));
+            e.registerBlockEntity(WiredElementCapability.get(), GATEWAY_ENTITY.get(), (be, side) -> be.element(side)));
         bus.addListener((BuildCreativeModeTabContentsEvent e) -> {
             if (e.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) e.accept(GATEWAY_ITEM);
         });

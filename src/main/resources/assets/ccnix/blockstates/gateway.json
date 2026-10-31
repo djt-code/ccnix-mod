@@ -1,5 +1,8 @@
 {
   "variants": {
-    "": { "model": "ccnix:block/gateway" }
+    "facing=north": { "model": "ccnix:block/gateway" },
+    "facing=east": { "model": "ccnix:block/gateway", "y": 90 },
+    "facing=south": { "model": "ccnix:block/gateway", "y": 180 },
+    "facing=west": { "model": "ccnix:block/gateway", "y": 270 }
   }
 }

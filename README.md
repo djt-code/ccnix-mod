@@ -226,8 +226,9 @@ it, end to end.
    | `tun.helper` | `ccnix-tun` | The helper, with any arguments before the device's name. |
    | `tun.device` | `ccnix0` | The TUN device. |
 
-5. **Place a Network Gateway** and cable it to CC routers' wired modems. It's crafted from a full wired modem, iron,
-   stone and redstone, and found in the Functional Blocks tab. `/ccnix` (operators) shows the gateway too:
+5. **Place a Network Gateway** and cable it to CC routers' wired modems. Its one network port faces you as you place it,
+   and a cable joins it only there. It's crafted from a full wired modem, gold, stone and an eye of ender (stone, gold,
+   stone / gold, modem, gold / stone, eye, stone), and found in the Functional Blocks tab. `/ccnix` (operators) shows the gateway too:
    - its mode, address, routes and blocks;
    - the neighbours it knows;
    - packets carried and dropped;

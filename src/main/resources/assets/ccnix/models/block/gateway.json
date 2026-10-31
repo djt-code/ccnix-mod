@@ -1,6 +1,9 @@
 {
-  "parent": "minecraft:block/cube_all",
+  "parent": "minecraft:block/orientable",
   "textures": {
-    "all": "ccnix:block/gateway"
+    "top": "ccnix:block/gateway_side",
+    "front": "ccnix:block/gateway_front",
+    "side": "ccnix:block/gateway_side",
+    "particle": "ccnix:block/gateway_side"
   }
 }

@@ -27,7 +27,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * A gateway block: a node on CC's wired network (cables join it from any side, as with a full-block modem) that
+ * A gateway block: a node on CC's wired network (a cable joins it at its port, the side it faces) that
  * hears every packet on it and passes those on the gateway's channel and its VLANs' to the gateway, and sends the
  * gateway's frames (its own, and other blocks' it carries) into it. Each has an ID and the player who placed it,
  * and its own filter: whether it passes untagged frames (the exchange) and which VLANs, both ways.
@@ -56,6 +56,16 @@ public final class GatewayBlockEntity extends BlockEntity implements Gateway.Por
 
     public WiredElement element() {
         return element;
+    }
+
+    /** The side its port is on: the only one a cable joins. */
+    public Direction port() {
+        return getBlockState().getValue(GatewayBlock.FACING);
+    }
+
+    /** CC's wired element on its port's side (for the capability), none on the others. */
+    public WiredElement element(Direction side) {
+        return side == null || side == port() ? element : null;
     }
 
     /** Its ID (0 until it's on a server). */
@@ -153,9 +163,10 @@ public final class GatewayBlockEntity extends BlockEntity implements Gateway.Por
         if (level != null && !isRemoved()) level.scheduleTick(worldPosition, getBlockState().getBlock(), 0);
     }
 
-    /** Join the wired elements beside it (its block's tick, when one comes or goes). */
+    /** Join the wired element at its port, and let go of any on another side (its block's tick, when one comes or goes). */
     void connect() {
         if (!(level instanceof ServerLevel server) || isRemoved()) return;
+        var port = port();
         for (var side : Direction.values()) {
             var pos = worldPosition.relative(side);
             var cache = neighbours[side.ordinal()];
@@ -165,7 +176,9 @@ public final class GatewayBlockEntity extends BlockEntity implements Gateway.Por
             }
             if (!server.isLoaded(pos)) continue;
             var other = cache.getCapability();
-            if (other != null) node.connectTo(other.getNode());
+            if (other == null) continue;
+            if (side == port) node.connectTo(other.getNode());
+            else node.disconnectFrom(other.getNode());
         }
     }
 
