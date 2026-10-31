@@ -108,7 +108,8 @@ public final class Config {
         .defineListAllowEmpty("forwards", List.of(), () -> "25570/tcp -> 10.1.1.10:23", o -> o instanceof String);
 
     public static final ModConfigSpec.BooleanValue OP_FORWARDS = BUILDER
-        .comment("Ops may change the forwards in game (/ccnix forward add|del, permission level 3), on opForwardPorts only.")
+        .comment("Ops may change the forwards in game (/ccnix forward add|del, permission level 3), on opForwardPorts only.",
+            "Always allowed in singleplayer, whatever this says, and on any port there unless opForwardPorts names some.")
         .define("opForwards", false);
 
     public static final ModConfigSpec.ConfigValue<String> OP_FORWARD_PORTS = BUILDER

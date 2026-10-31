@@ -39,7 +39,8 @@ import static net.minecraft.commands.Commands.literal;
  *   /ccnix route add &lt;net/len&gt; via &lt;router&gt;  (gateway.opRoutes or singleplayer, no larger than gateway.opMaxSubnet)
  *   /ccnix route del &lt;net/len&gt;
  *   /ccnix forward                          the port forwards, and the ports ops may forward
- *   /ccnix forward add &lt;port&gt;[/udp] &lt;a.b.c.d&gt;:&lt;port&gt;   (NAT mode, nat.opForwards, on nat.opForwardPorts)
+ *   /ccnix forward add &lt;port&gt;[/udp] &lt;a.b.c.d&gt;:&lt;port&gt;   (NAT mode, nat.opForwards, on nat.opForwardPorts;
+ *                                           in singleplayer always, on any port unless opForwardPorts says)
  *   /ccnix forward del &lt;port&gt;[/udp]
  *   /ccnix rom update                       git pull (or clone) ccnix-rom/ in the server's folder, then reload
  * </pre>
@@ -63,7 +64,7 @@ final class CcnixCommand {
                 .then(literal("del").requires(s -> s.hasPermission(OPS))
                     .then(argument("network", greedyString()).executes(ctx -> delRoute(ctx.getSource(), getString(ctx, "network"))))))
             .then(literal("forward")
-                .executes(ctx -> say(ctx, forwards()))
+                .executes(ctx -> say(ctx, forwards(ctx.getSource())))
                 .then(literal("add").requires(s -> s.hasPermission(OPS))
                     .then(argument("forward", greedyString()).executes(ctx -> addForward(ctx.getSource(), getString(ctx, "forward")))))
                 .then(literal("del").requires(s -> s.hasPermission(OPS))
@@ -184,20 +185,27 @@ final class CcnixCommand {
     // Port forwards (NAT mode)
     // ---------------------------------------------------------------------------------------------------------------
 
-    private static int[] opRange() {
-        return OpForwards.range(Config.OP_FORWARD_PORTS.get());
+    /** nat.opForwards, or always in singleplayer, where the player is the server's admin. */
+    private static boolean opForwards(CommandSourceStack src) {
+        return Config.OP_FORWARDS.get() || !src.getServer().isDedicatedServer();
     }
 
-    private static List<String> forwards() {
+    /** nat.opForwardPorts; in singleplayer with none set, any port. */
+    private static int[] opRange(CommandSourceStack src) {
+        var range = OpForwards.range(Config.OP_FORWARD_PORTS.get());
+        return range == null && !src.getServer().isDedicatedServer() ? new int[] {1, 65535} : range;
+    }
+
+    private static List<String> forwards(CommandSourceStack src) {
         var out = new ArrayList<String>();
         if (!Service.mode().equals("nat")) {
             out.add("TUN mode: no port forwards here; the server's admin forwards ports with the host's firewall");
             return out;
         }
         var list = Service.natConfig().forwards();
-        var closed = OpForwards.closed(true, Config.OP_FORWARDS.get(), opRange());
+        var closed = OpForwards.closed(true, opForwards(src), opRange(src));
         out.add((list.isEmpty() ? "no port forwards" : list.size() + " port forward" + (list.size() == 1 ? "" : "s"))
-            + (closed == null ? " (ops may forward " + OpForwards.says(opRange())
+            + (closed == null ? " (ops may forward " + OpForwards.says(opRange(src))
             + ": /ccnix forward add <port>[/udp] <a.b.c.d>:<port>)" : " (" + closed + ")"));
         for (var f : list) out.add("  " + f);
         return out;
@@ -205,7 +213,7 @@ final class CcnixCommand {
 
     private static int addForward(CommandSourceStack src, String line) {
         var cfg = Service.natConfig();
-        var check = OpForwards.add(line, Service.mode().equals("nat"), Config.OP_FORWARDS.get(), opRange(), cfg.networks(),
+        var check = OpForwards.add(line, Service.mode().equals("nat"), opForwards(src), opRange(src), cfg.networks(),
             cfg.forwards());
         if (check.problem() != null) return fail(src, "Not added: " + check.problem());
         var list = new ArrayList<String>(Config.FORWARDS.get());
@@ -213,12 +221,12 @@ final class CcnixCommand {
         saveForwards(list);
         LOG.info("ccnix: {} added the forward {}", src.getTextName(), check.forward());
         src.sendSuccess(() -> Component.literal("Forwarding " + check.forward() + " (ops may forward "
-            + OpForwards.says(opRange()) + ")"), true);
+            + OpForwards.says(opRange(src)) + ")"), true);
         return 1;
     }
 
     private static int delForward(CommandSourceStack src, String port) {
-        var check = OpForwards.del(port, Service.mode().equals("nat"), Config.OP_FORWARDS.get(), opRange(),
+        var check = OpForwards.del(port, Service.mode().equals("nat"), opForwards(src), opRange(src),
             Service.natConfig().forwards());
         if (check.problem() != null) return fail(src, "Not removed: " + check.problem());
         var key = check.forward().key();
