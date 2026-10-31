@@ -145,6 +145,19 @@ class NatTest {
     }
 
     @Test
+    void tracerouteSeesTheGatewayAsAHopThenProhibited() throws Exception {
+        world();
+        w.lua("B.echo('8.8.8.8', 9, 1, 2); B.echo('8.8.8.8', 9, 2, 3)");   // (R takes one off: 1, then 2, at the gateway)
+        w.pump(1);
+        assertEquals("timeexceeded 10.0.0.1 ttl 1", w.luaString(
+            "local e = H.find('net_icmp', 2)[1]; return e[2] .. ' ' .. e[3] .. ' ' .. e[4] .. ' ' .. e[5].seq"),
+            "the TTL runs out at the gateway: time exceeded, so traceroute shows it as a hop");
+        assertEquals("unreachable 10.0.0.1 prohibited 2", w.luaString(
+            "local e = H.find('net_icmp', 2)[2]; return e[2] .. ' ' .. e[3] .. ' ' .. e[4] .. ' ' .. e[5].seq"),
+            "one more: it would go out, so administratively prohibited (traceroute's !X, the hop after)");
+    }
+
+    @Test
     void tcpOutAndBack() throws Exception {
         world();
         var server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());

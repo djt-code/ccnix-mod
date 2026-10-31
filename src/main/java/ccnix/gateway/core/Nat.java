@@ -16,7 +16,8 @@ import java.util.function.LongSupplier;
  * privileges. It's transport only: CC's TCP connections and UDP flows to the outside are carried as the server's own
  * sockets ({@link Outside}), their bytes passed through unread. Besides that it answers ping at the gateway's address,
  * passes packets between CC networks back to the gateway (as the server's kernel does in TUN mode), says
- * "administratively prohibited" for an echo to the outside (it can't send ICMP there) and for a datagram the policy
+ * "time exceeded" for a packet whose TTL runs out there (it's a hop, as a router is), "administratively
+ * prohibited" for an echo that would go on to the outside (it can't send ICMP there) and for a datagram the policy
  * refuses, relays port 53 at the gateway's address to the
  * server's resolver (or on Windows answers it: the one exception), and carries port forwards in from outside.
  * <p>
@@ -153,6 +154,8 @@ public final class Nat implements Gateway.Tun {
             hairpin(p, m, ttl);
         } else if (!gw.onNetwork(src) && !cfg.cc(src)) {
             dropped++;
+        } else if (ttl <= 1) {
+            icmpError(m, "timeexceeded", "ttl");         // (the gateway is a hop, as a router is: out is past it)
         } else if ("tcp".equals(proto)) {
             tcpOut(src, dst, d);
         } else if ("udp".equals(proto)) {
