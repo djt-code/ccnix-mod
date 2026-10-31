@@ -54,6 +54,11 @@ public final class Gateway {
         /** It stands by now (for active, on its network), or works again (active null). */
         default void standby(Port active) {
         }
+
+        /** Its own filter: whether it passes VLAN vlan (0: untagged, the exchange) either way; all by default. */
+        default boolean carries(int vlan) {
+            return true;
+        }
     }
 
     /** The TUN device. */
@@ -69,7 +74,7 @@ public final class Gateway {
 
     /** One block's counts. */
     private static final class Stats {
-        long in, out, relayed;
+        long in, out, relayed, filtered;
         final BitSet vlans = new BitSet();
     }
 
@@ -230,6 +235,10 @@ public final class Gateway {
         if (!(f.get("src") instanceof String src) || !(f.get("dst") instanceof String dst)) return;
         var stats = ports.get(port);
         if (stats == null || standby.containsKey(port) || src.equals(s.mac())) return;
+        if (!port.carries(vlan)) {
+            stats.filtered++;
+            return;
+        }
         stats.in++;
         if (vlan > 0) stats.vlans.set(vlan);
         macs.put(channel + " " + src, new Learned(port, clock.getAsLong() + MAC_TTL));
@@ -261,6 +270,10 @@ public final class Gateway {
     private void out(Port p, int channel, Map<String, Object> f, boolean relay) {
         var stats = ports.get(p);
         if (stats == null) return;
+        if (!p.carries(channel - settings.channel())) {
+            stats.filtered++;
+            return;
+        }
         stats.out++;
         if (relay) {
             stats.relayed++;
@@ -455,7 +468,8 @@ public final class Gateway {
                 + " takes over if that one goes)");
             return out;
         }
-        out.add("frames: " + stats.in + " in, " + stats.out + " out (" + stats.relayed + " from other blocks)");
+        out.add("frames: " + stats.in + " in, " + stats.out + " out (" + stats.relayed + " from other blocks)"
+            + (stats.filtered > 0 ? ", " + stats.filtered + " filtered" : ""));
         out.add(behind.size() + (behind.size() == 1 ? " MAC" : " MACs") + " heard here"
             + (behind.isEmpty() ? "" : ": " + String.join(", ", behind.stream().limit(8).toList())
             + (behind.size() > 8 ? ", ..." : "")));

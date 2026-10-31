@@ -29,11 +29,13 @@ import java.util.UUID;
 /**
  * A gateway block: a node on CC's wired network (cables join it from any side, as with a full-block modem) that
  * hears every packet on it and passes those on the gateway's channel and its VLANs' to the gateway, and sends the
- * gateway's frames (its own, and other blocks' it carries) into it. Each has an ID and the player who placed it.
+ * gateway's frames (its own, and other blocks' it carries) into it. Each has an ID and the player who placed it,
+ * and its own filter: whether it passes untagged frames (the exchange) and which VLANs, both ways.
  */
 public final class GatewayBlockEntity extends BlockEntity implements Gateway.Port {
     /** The blocks' beacon: on a channel no modem can open, so only blocks hear it. */
     static final int HELLO = -1;
+    static final String ALL_VLANS = "1-" + Gateway.VLAN_MAX;
 
     private final Element element = new Element();
     private final WiredNode node = ComputerCraftAPI.createWiredNodeForElement(element);
@@ -43,6 +45,9 @@ public final class GatewayBlockEntity extends BlockEntity implements Gateway.Por
     private UUID owner;
     private String ownerName = "";
     private boolean warned;
+    private volatile boolean untagged = true;
+    private volatile String vlanSpec = ALL_VLANS;
+    private volatile java.util.BitSet vlanSet = Gateway.vlans(ALL_VLANS, new ArrayList<>());
 
     public GatewayBlockEntity(BlockPos pos, BlockState state) {
         super(Ccnix.GATEWAY_ENTITY.get(), pos, state);
@@ -100,6 +105,8 @@ public final class GatewayBlockEntity extends BlockEntity implements Gateway.Por
         if (owner != null) tag.putUUID("owner", owner);
         if (!ownerName.isEmpty()) tag.putString("ownerName", ownerName);
         if (warned) tag.putBoolean("warned", true);
+        if (!untagged) tag.putBoolean("noUntagged", true);
+        if (!vlanSpec.equals(ALL_VLANS)) tag.putString("vlans", vlanSpec);
     }
 
     @Override
@@ -109,6 +116,37 @@ public final class GatewayBlockEntity extends BlockEntity implements Gateway.Por
         owner = tag.hasUUID("owner") ? tag.getUUID("owner") : null;
         ownerName = tag.getString("ownerName");
         warned = tag.getBoolean("warned");
+        untagged = !tag.getBoolean("noUntagged");
+        vlanSpec = tag.contains("vlans") ? tag.getString("vlans") : ALL_VLANS;
+        vlanSet = Gateway.vlans(vlanSpec, new ArrayList<>());
+    }
+
+    @Override
+    public boolean carries(int vlan) {
+        return vlan == 0 ? untagged : vlanSet.get(vlan);
+    }
+
+    /** Its owner may change its filter, and an op may change any block's. */
+    boolean mayChange(ServerPlayer player) {
+        return player.getUUID().equals(owner) || player.hasPermissions(2);
+    }
+
+    /** A new filter, or what's wrong with it (nothing changed then). */
+    String filter(boolean untagged, String vlans) {
+        var problems = new ArrayList<String>();
+        var set = Gateway.vlans(vlans, problems);
+        if (!problems.isEmpty()) return problems.get(0);
+        this.untagged = untagged;
+        vlanSpec = vlans.trim();
+        vlanSet = set;
+        setChanged();
+        return null;
+    }
+
+    /** Its dialog, on player's screen, with what the last change said. */
+    void openFor(ServerPlayer player, String message) {
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
+            new GatewayScreenData(worldPosition, stats(), untagged, vlanSpec, mayChange(player), message));
     }
 
     private void scheduleConnect() {
@@ -172,6 +210,8 @@ public final class GatewayBlockEntity extends BlockEntity implements Gateway.Por
         var out = new ArrayList<String>();
         out.add(name() + (owner == null ? "" : ", placed by " + ownerName) + ", at " + where());
         out.addAll(Service.portStatus(this));
+        out.add("its filter: " + (untagged ? "untagged" : "no untagged") + ", VLANs "
+            + (vlanSet.isEmpty() ? "none" : Gateway.says(vlanSet)));
         return out;
     }
 

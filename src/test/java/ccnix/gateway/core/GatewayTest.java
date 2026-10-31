@@ -19,6 +19,7 @@ class GatewayTest {
         int hellos;
         long rank;
         final List<Gateway.Port> standbys = new ArrayList<>();
+        java.util.function.IntPredicate filter = v -> true;
 
         @Override
         public void send(int channel, Map<String, Object> frame) {
@@ -39,6 +40,11 @@ class GatewayTest {
         @Override
         public void standby(Gateway.Port active) {
             standbys.add(active);
+        }
+
+        @Override
+        public boolean carries(int vlan) {
+            return filter.test(vlan);
         }
     }
 
@@ -210,6 +216,26 @@ class GatewayTest {
         g.fromCc(other, CH, arpRequest("4:back", "10.0.0.4", "10.0.0.8"));
         assertEquals(1, lan.sent.size());
         assertEquals(1, third.sent.size(), "apart again: each gets one");
+    }
+
+    @Test
+    void eachBlocksOwnFilter() {
+        var third = new Port();
+        g.addPort(third);
+        other.filter = v -> v != 0 && v >= 20 && v <= 29;  // (a trunk: no exchange, VLANs 20-29)
+        g.fromCc(lan, CH, frame("3:back", "*", "arp", t()));
+        g.fromCc(lan, CH + 25, frame("3:back.25", "*", "arp", t()));
+        g.fromCc(lan, CH + 30, frame("3:back.30", "*", "arp", t()));
+        assertEquals(List.of(CH + 25), other.channels, "out of other: VLAN 25 only");
+        assertEquals(List.of(CH, CH + 25, CH + 30), third.channels, "third is open");
+        g.fromCc(other, CH, arpRequest("4:back", "10.0.0.4", "10.0.0.1"));
+        g.fromCc(other, CH + 30, frame("4:back.30", "*", "arp", t()));
+        g.fromCc(other, CH + 21, frame("4:back.21", "*", "arp", t()));
+        assertEquals(1, lan.sent.stream().filter(f -> "4:back.21".equals(f.get("src"))).count(), "in from other: 21 only");
+        assertEquals(1, lan.sent.size(), "not its untagged ARP: the gateway didn't hear it, so no answer either");
+        g.fromTun(udpTo("10.0.0.255"));
+        assertEquals(List.of(CH + 25), other.channels, "nor the gateway's own frames (they're untagged)");
+        assertTrue(g.portStatus(other).get(0).endsWith(", 5 filtered"), g.portStatus(other).get(0));
     }
 
     @Test

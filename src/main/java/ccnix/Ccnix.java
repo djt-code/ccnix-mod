@@ -2,6 +2,8 @@ package ccnix;
 
 import ccnix.gateway.GatewayBlock;
 import ccnix.gateway.GatewayBlockEntity;
+import ccnix.gateway.GatewayFilter;
+import ccnix.gateway.GatewayScreenData;
 import ccnix.gateway.GatewayItem;
 import ccnix.gateway.Service;
 import ccnix.rom.RomPack;
@@ -26,6 +28,7 @@ import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -62,6 +65,9 @@ public final class Ccnix {
             if (e.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) e.accept(GATEWAY_ITEM);
         });
         bus.addListener(RomPack::addTo);
+        bus.addListener((RegisterPayloadHandlersEvent e) -> e.registrar("1")
+            .playToClient(GatewayScreenData.TYPE, GatewayScreenData.STREAM_CODEC, GatewayScreenData::handle)
+            .playToServer(GatewayFilter.TYPE, GatewayFilter.STREAM_CODEC, GatewayFilter::handle));
         bus.addListener((ModConfigEvent.Reloading e) -> {
             if (e.getConfig().getSpec() == Config.SPEC) Service.reconfigure();
         });

@@ -94,8 +94,11 @@ block its MAC was last heard on, a broadcast to all of them.
   unloaded): a spare, not a loop. Its owner is told once, and its right-click says so.
 - **IDs and owners.** Each block gets an ID when placed, and remembers who placed it. A player may have
   `gateway.maxPerPlayer` (5) placed; `/ccnix gateways` lists them all.
-- **Right-click** one with an empty hand for its stats: its ID and owner, frames in and out, the MACs heard behind it,
-  the VLANs seen, whether it stands by.
+- **Right-click** one with an empty hand for its dialog: its ID and owner, frames in and out, the MACs heard behind it,
+  the VLANs seen, whether it stands by, and its own filter.
+- **Each block's filter** (in its dialog; its owner's to change, or an op's): whether it passes untagged frames (the
+  exchange: untick it, and the block is a VLAN trunk with no way to the gateway itself) and which VLANs
+  (`"1-4094"`, the default, `"10,20,100-199"`, or empty for none), both ways, within `gateway.vlans`.
 
 ### NAT mode
 

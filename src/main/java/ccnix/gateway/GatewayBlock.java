@@ -2,7 +2,6 @@ package ccnix.gateway;
 
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
@@ -19,7 +18,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 
-/** The gateway: a full block that CC cables join. Right-click with an empty hand for its stats. */
+/** The gateway: a full block that CC cables join. Right-click with an empty hand for its dialog. */
 public final class GatewayBlock extends Block implements EntityBlock {
     public static final MapCodec<GatewayBlock> CODEC = simpleCodec(GatewayBlock::new);
 
@@ -69,8 +68,8 @@ public final class GatewayBlock extends Block implements EntityBlock {
 
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
-        if (!level.isClientSide && level.getBlockEntity(pos) instanceof GatewayBlockEntity gateway) {
-            for (var line : gateway.stats()) player.sendSystemMessage(Component.literal(line));
+        if (player instanceof ServerPlayer p && level.getBlockEntity(pos) instanceof GatewayBlockEntity gateway) {
+            gateway.openFor(p, "");
         }
         return InteractionResult.sidedSuccess(level.isClientSide);
     }
