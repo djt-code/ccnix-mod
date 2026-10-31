@@ -70,3 +70,6 @@ ccnix_nat_forwards: []
 ccnix_nat_op_forwards: false
 ccnix_nat_op_forward_ports: ""
 ccnix_ansible_forwards: false
+# A forward on a port below 1024 (23/tcp) needs this: the server's unit
+# gets CAP_NET_BIND_SERVICE, which lets it listen on any low port.
+ccnix_nat_low_ports: false

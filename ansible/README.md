@@ -9,6 +9,7 @@ nothing unless the bundle or a variable did.
 | File | What |
 |---|---|
 | `inventory.example.ini` | the hosts: copy to `inventory.ini` (ignored by git) with yours; the user needs passwordless sudo |
+| `host_vars/<host>.yml` | (yours, ignored by git) one host's own values over `group_vars`: `ccnix_gateway_mode: nat`, its forwards |
 | `group_vars/minecraft.yml` | versions, heap, ports, `server.properties` keys, the gateway's mode, address, CC networks and routes, the TUN device, forwarding and NAT, NAT mode's policy and forwards |
 | `site.yml` | the play |
 | `templates/` | `minecraft.service`, `ccnix-tun.service`, the first `ccnix-server.toml` |
@@ -87,6 +88,7 @@ and inside `ccnix_cc_networks`; they never reach the host's routing.
 | `ccnix_nat_forwards` | `[]` | `"25570/tcp -> 10.1.1.10:23"` |
 | `ccnix_nat_op_forwards`, `ccnix_nat_op_forward_ports` | `false`, `""` | ops may change forwards in game, on these ports only |
 | `ccnix_ansible_forwards` | `false` | each run sets the forwards to `ccnix_nat_forwards` |
+| `ccnix_nat_low_ports` | `false` | the server may listen below 1024, for a forward like `23/tcp` (its unit gets `CAP_NET_BIND_SERVICE`) |
 
 The limits and lists apply only to CC computers' connections through a
 Network Gateway, never to the server's own or its players'. Forwards are

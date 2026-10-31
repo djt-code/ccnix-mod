@@ -14,3 +14,4 @@ bin/
 helper/ccnix-tun
 server-bundle.tar.gz
 ansible/inventory.ini
+ansible/host_vars/
