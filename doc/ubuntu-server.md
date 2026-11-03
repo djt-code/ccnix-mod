@@ -295,7 +295,9 @@ banner.
 **HTTP from A.** On the VM: `python3 -m http.server 8000`; on A:
 `curl -i http://10.0.0.1:8000/` (ccnix 0.10.0) prints the status line, the
 headers and the directory listing. ccnix's curl is a small HTTP-only one;
-curl itself is Daniel Stenberg's (https://curl.se).
+curl itself is Daniel Stenberg's (https://curl.se). The other way: on A,
+`mkdir /www`, an `index.html` there, and `httpd` (ccnix 0.11.0); on the VM
+`curl -i http://10.1.0.6/`, or a browser on a machine with a route in.
 
 **Telnet into A.** On A:
 
