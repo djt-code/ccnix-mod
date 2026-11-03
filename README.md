@@ -183,10 +183,11 @@ it, end to end.
    sudo helper/ccnix-tun-setup minecraft 10.0.0.1/24 10.1.0.0/16
    ```
 
-   - The networks go in a routing table of their own (4040, or `TABLE=`), which the host's own routes come before
+   - The networks go in a routing table of their own (25565, the Minecraft port, or `TABLE=`), which the host's own routes come before
      (all but its default route). So they can't take the host's LAN, its gateway or any route it has: they only
      stand in for the default route, for the addresses in them. Every route the gateway has, ops' too, has to be
-     inside one of them. `ip route show table 4040` lists them.
+     inside one of them. `ip route show table 25565` lists them; the policy rules are at priorities 25565 and 25566 (`ip rule`). Before
+     ccnix-mod 0.14.0 the table was 4040: running the script again takes those rules away.
 
    - `FORWARD=1` lets the server route between CC's networks and its own.
    - `NAT=eth0` also masquerades CC's networks going out of `eth0`. With it, CC computers can reach the real

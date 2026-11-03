@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class OpRoutesTest {
     // what `ip -4 route show table all dev ccnix0` says on a server set up by ccnix-tun-setup
     static final String IP_OUTPUT = """
-        10.0.0.0/8 table 4040 proto boot scope link\s
+        10.0.0.0/8 table 25565 proto boot scope link\s
         10.0.0.0/24 proto kernel scope link src 10.0.0.1\s
         local 10.0.0.1 table local proto kernel scope host src 10.0.0.1\s
         broadcast 10.0.0.255 table local proto kernel scope link src 10.0.0.1\s
@@ -29,7 +29,7 @@ class OpRoutesTest {
     @Test
     void theServersRoutesIntoTheDevice() {
         assertEquals(2, TUN.size(), "local and broadcast aren't routes into it");
-        assertEquals("10.0.0.0/8 (table 4040)", TUN.get(0).toString());
+        assertEquals("10.0.0.0/8 (table 25565)", TUN.get(0).toString());
         assertEquals("10.0.0.0/24", TUN.get(1).toString());
         var host = OpRoutes.parseIpRoutes("10.9.9.9 proto boot scope link\ndefault table 7 scope link\n");
         assertEquals(32, host.get(0).prefix(), "a bare address is a /32");
@@ -57,7 +57,7 @@ class OpRoutesTest {
     void neverOutsideWhatTheServerRoutesIntoTheDevice() {
         // a public network, or the host's own LAN: the server doesn't route them into the device, so no op can
         assertTrue(problem("8.8.0.0/16 via 10.0.0.3").contains("doesn't route 8.8.0.0/16 into the TUN device"));
-        assertTrue(problem("192.168.1.0/24 via 10.0.0.3").contains("it routes 10.0.0.0/8 (table 4040), 10.0.0.0/24"));
+        assertTrue(problem("192.168.1.0/24 via 10.0.0.3").contains("it routes 10.0.0.0/8 (table 25565), 10.0.0.0/24"));
         assertTrue(OpRoutes.add("10.2.0.0/16 via 10.0.0.3", settings(), 16, NETS, List.of()).problem().contains("routes nothing there"));
     }
 

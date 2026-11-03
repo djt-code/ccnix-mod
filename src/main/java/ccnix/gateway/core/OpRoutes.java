@@ -99,7 +99,7 @@ public final class OpRoutes {
     }
 
     /**
-     * The unicast routes in {@code ip -4 route show table all dev <device>}'s output: "10.0.0.0/8 table 4040 proto
+     * The unicast routes in {@code ip -4 route show table all dev <device>}'s output: "10.0.0.0/8 table 25565 proto
      * boot scope link", "10.0.0.0/24 proto kernel scope link src 10.0.0.1" (a bare address is a /32).
      */
     public static List<HostRoute> parseIpRoutes(String output) {

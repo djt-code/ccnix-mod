@@ -38,7 +38,10 @@ ccnix_gateway_routes: ["10.1.0.0/16 via 10.0.0.2"]   # CC networks behind CC rou
 # that the host's own routes come before.
 ccnix_cc_networks: ["10.1.0.0/16"]
 ccnix_tun_device: ccnix0
-ccnix_tun_table: 4040
+# The table, and the policy rules' priorities (it, and it + 1 for the
+# table's own lookup): the game's port, 25565 unless minecraft_ports
+# says another (1-32764: rule priorities stop at 32765).
+ccnix_tun_table: "{{ (minecraft_ports | first).split('/') | first | int }}"
 ccnix_forward: true             # the server routes between CC's networks and its LAN
 ccnix_nat: ""                   # an uplink name (eth0) to masquerade CC's networks out of it
 # BCP 38, CC computers forging sources: the mod drops a packet from CC

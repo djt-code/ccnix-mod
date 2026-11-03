@@ -22,8 +22,9 @@
 #
 # From the environment:
 #   DEVICE=ccnix0   the device's name (the mod's tun.device)
-#   TABLE=4040      the routing table, and the rules' priority (TABLE and
-#                   TABLE + 1)
+#   TABLE=25565     the routing table (the Minecraft port), and the rules'
+#                   priorities: TABLE for the host's own routes, TABLE + 1
+#                   for the table (below 32766, so TABLE 32764 at most)
 #   FORWARD=1       turn on IPv4 forwarding, so the server routes between
 #                   CC's networks (through the gateway) and its own
 #   NAT=eth0        and masquerade CC's networks going out of eth0, so
@@ -41,12 +42,22 @@
 set -e
 
 if [ $# -lt 1 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-    sed -n '2,40s/^# \{0,1\}//p' "$0"
+    sed -n '2,41s/^# \{0,1\}//p' "$0"
     exit 2
 fi
+
+# ccnix-mod before 0.14.0 used table 4040 (rules 4040 and 4041): those go
+# when it's another table now, matched exactly, so no one else's rule does
+legacy() {
+    [ "$table" = 4040 ] && return 0
+    ip rule del pref 4040 lookup main suppress_prefixlength 0 2>/dev/null || true
+    ip rule del pref 4041 lookup 4040 2>/dev/null || true
+    ip route flush table 4040 dev "$dev" 2>/dev/null || true
+}
 if [ "$1" = "--remove" ]; then
     dev=${DEVICE:-ccnix0}
-    table=${TABLE:-4040}
+    table=${TABLE:-25565}
+    legacy
     ip link del "$dev" 2>/dev/null || true
     if command -v iptables >/dev/null 2>&1; then
         for c in INPUT FORWARD; do
@@ -64,7 +75,15 @@ user=$1
 addr=${2:-10.0.0.1/24}
 [ $# -gt 1 ] && shift 2 || shift
 dev=${DEVICE:-ccnix0}
-table=${TABLE:-4040}
+table=${TABLE:-25565}
+case $table in
+    *[!0-9]* | "") echo "TABLE=$table: give a number" >&2; exit 2;;
+esac
+if [ "$table" -lt 1 ] || [ "$table" -gt 32764 ]; then
+    echo "TABLE=$table: 1-32764 (it's the rules' priority too, and those stop at 32765)" >&2
+    exit 2
+fi
+legacy
 
 ip link show "$dev" >/dev/null 2>&1 || ip tuntap add dev "$dev" mode tun user "$user"
 ip addr replace "$addr" dev "$dev"
