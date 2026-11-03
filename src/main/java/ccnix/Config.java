@@ -51,7 +51,8 @@ public final class Config {
         .defineInRange("channel", Settings.DEFAULT_CHANNEL, 0, 65535 - Gateway.VLAN_MAX);
 
     public static final ModConfigSpec.ConfigValue<String> MAC = BUILDER
-        .comment("The gateway's MAC on the CC network (CC's are \"<computer id>:<interface>\").")
+        .comment("The gateway's MAC on the CC network, a unicast aa:bb:cc:dd:ee:ff. ccnix's are locally administered:",
+            "02:cc: then a computer's ID (3 bytes) and a port byte; 02:cc:ff is this mod's.")
         .define("mac", Settings.DEFAULT_MAC);
 
     public static final ModConfigSpec.ConfigValue<List<? extends String>> ROUTES = BUILDER

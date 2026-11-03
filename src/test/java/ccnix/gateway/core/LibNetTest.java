@@ -26,7 +26,7 @@ class LibNetTest {
     @BeforeEach
     void setUp() throws Exception {
         var problems = new ArrayList<String>();
-        w = new CcWorld(Settings.parse("10.0.0.1/24", Settings.DEFAULT_CHANNEL, "gateway", List.of("10.1.0.0/16 via 10.0.0.2"), problems));
+        w = new CcWorld(Settings.parse("10.0.0.1/24", Settings.DEFAULT_CHANNEL, Settings.DEFAULT_MAC, List.of("10.1.0.0/16 via 10.0.0.2"), problems));
         w.wire("lan", 1, "back").wire("lan", 3, "back").wire("far", 3, "left").wire("far", 2, "back");
         w.gatewayOn("lan");
         w.lua("""

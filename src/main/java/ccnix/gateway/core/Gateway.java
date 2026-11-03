@@ -36,7 +36,7 @@ import java.util.function.LongSupplier;
  * Not thread-safe: the mod calls it from one thread.
  */
 public final class Gateway {
-    public static final String BROADCAST = "*";
+    public static final String BROADCAST = "ff:ff:ff:ff:ff:ff";
     public static final int VLAN_MAX = 4094;
     static final long ARP_TTL = 300_000, ARP_RETRY = 1_000, MAC_TTL = 300_000, HELLO_EVERY = 2_000, PEER_TTL = 7_000;
     static final int ARP_TRIES = 3, QUEUE_MAX = 32, RECENT = 64;
@@ -474,7 +474,7 @@ public final class Gateway {
         var s = settings;
         long now = clock.getAsLong();
         var out = new ArrayList<String>();
-        out.add("address " + s.address() + ", MAC \"" + s.mac() + "\", channel " + s.channel() + ", " + ports.size()
+        out.add("address " + s.address() + ", MAC " + s.mac() + ", channel " + s.channel() + ", " + ports.size()
             + (ports.size() == 1 ? " block" : " blocks") + " (" + standby.size() + " standing by)"
             + "; VLANs carried: " + says(vlans));
         for (var r : s.routes()) out.add("route " + r);

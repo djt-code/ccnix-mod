@@ -10,7 +10,8 @@ import java.util.List;
 public record Settings(long ip, int prefix, int channel, String mac, List<Route> routes) {
     public static final String DEFAULT_ADDRESS = "10.0.0.1/24";
     public static final int DEFAULT_CHANNEL = 60000;
-    public static final String DEFAULT_MAC = "gateway";
+    /** ccnix's MACs are 02:cc:<computer ID>:<port byte>; 02:cc:ff is the mod's. */
+    public static final String DEFAULT_MAC = "02:cc:ff:00:00:00";
 
     /** net/prefix via gw. */
     public record Route(long net, int prefix, long gw) {
@@ -64,11 +65,13 @@ public record Settings(long ip, int prefix, int channel, String mac, List<Route>
             problems.add("address \"" + address + "\" isn't a.b.c.d/len (len 1-30): using " + DEFAULT_ADDRESS);
             a = cidr(DEFAULT_ADDRESS);
         }
-        if (mac == null || mac.isBlank() || mac.equals(Gateway.BROADCAST)) {
-            problems.add("mac \"" + mac + "\" can't be used: using " + DEFAULT_MAC);
-            mac = DEFAULT_MAC;
+        var m = mac(mac);
+        if (m == null || (Integer.parseInt(m.substring(0, 2), 16) & 1) != 0) {
+            problems.add("mac \"" + mac + "\" isn't a unicast MAC (aa:bb:cc:dd:ee:ff"
+                + ("gateway".equals(mac) ? ", since ccnix-mod 0.15.0" : "") + "): using " + DEFAULT_MAC);
+            m = DEFAULT_MAC;
         }
-        var s = new Settings(a[0], (int) a[1], channel, mac.trim(), List.of());
+        var s = new Settings(a[0], (int) a[1], channel, m, List.of());
         var kept = new ArrayList<Route>();
         for (var line : routes) {
             var words = line.trim().split("\\s+");
@@ -84,6 +87,14 @@ public record Settings(long ip, int prefix, int channel, String mac, List<Route>
             }
         }
         return new Settings(s.ip, s.prefix, s.channel, s.mac, List.copyOf(kept));
+    }
+
+    /** "02:CC:FF:00:00:00" or "02-cc-ff-00-00-00" as "02:cc:ff:00:00:00", lib/net's form; null if not a MAC. */
+    public static String mac(String s) {
+        if (s == null) return null;
+        s = s.trim().toLowerCase(java.util.Locale.ROOT);
+        if (!s.matches("\\p{XDigit}{2}([:-]\\p{XDigit}{2}){5}")) return null;
+        return s.replace('-', ':');
     }
 
     /** { ip, len } from "a.b.c.d/len" ("default" is 0.0.0.0/0), or null. */

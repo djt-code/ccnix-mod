@@ -209,7 +209,7 @@ the server runs.
     networks = ["10.1.0.0/16"]                 # the CC networks: routes must be inside
     address = "10.0.0.1/24"
     channel = 60000
-    mac = "gateway"
+    mac = "02:cc:ff:00:00:00"
     routes = ["10.1.0.0/16 via 10.0.0.2"]      # the CC router below
     opRoutes = true                            # ops may /ccnix route add|del
     opMaxSubnet = 16                           # a /16 at most

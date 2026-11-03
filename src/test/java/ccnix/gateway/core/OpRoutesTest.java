@@ -19,7 +19,7 @@ class OpRoutesTest {
     static final List<NatConfig.Net> NETS = List.of(NatConfig.net("0.0.0.0/0"));   // (any: these are about the kernel)
 
     static Settings settings(String... routes) {
-        return Settings.parse("10.0.0.1/24", Settings.DEFAULT_CHANNEL, "gateway", List.of(routes), new ArrayList<>());
+        return Settings.parse("10.0.0.1/24", Settings.DEFAULT_CHANNEL, Settings.DEFAULT_MAC, List.of(routes), new ArrayList<>());
     }
 
     static String problem(String line) {

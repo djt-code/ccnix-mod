@@ -136,7 +136,7 @@ own (Java sockets), carried byte for byte, and the gateway answers ping at its a
 ```
  CC host 10.0.0.5 ─┐
                    ├─ cable ─ [Network Gateway] ··· ccnix-tun ─ ccnix0 (10.0.0.1) ─ the server's kernel ─ eth0
- CC router 10.0.0.2┘   10.0.0.1, MAC "gateway",     (helper,
+ CC router 10.0.0.2┘   10.0.0.1, 02:cc:ff:00:00:00, (helper,
    └ 10.1.0.0/16 behind it   channel 60000        no privileges)
 ```
 
