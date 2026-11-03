@@ -329,7 +329,11 @@ desktop's ACK, and a browser waits, then retries on new ports (on the
 VM, `tcpdump -eni any tcp port 80` shows the SYNs arriving from the
 router's MAC, and SYN-ACKs going straight out). Add the route on the
 desktop (`route -p add` keeps it), or let the router pass traffic in and
-out of the same interface without tracking its state.
+out of the same interface without tracking its state. For good, give the
+VM a link of its own to the router (a small subnet or VLAN for the two
+of them, the router's route to CC's networks via the VM's address on it):
+then every machine's traffic goes through the router both ways, and no
+desktop needs a route.
 
 ## 9. When it doesn't
 
