@@ -320,6 +320,17 @@ script, and on the desktop a route to CC's networks through the VM, e.g.
 Windows `route add 10.0.0.0 mask 255.0.0.0 <vm address>`; then `telnet
 10.1.0.6` from there.
 
+The route on the desktop itself, not only on the LAN's router. With the
+desktop and the VM on one LAN and the route only on the router, the
+desktop's packets go through the router but the VM's answers come
+straight back: asymmetric. Ping still works, but TCP doesn't: a
+stateful router sees the SYN and never the SYN-ACK, so it drops the
+desktop's ACK, and a browser waits, then retries on new ports (on the
+VM, `tcpdump -eni any tcp port 80` shows the SYNs arriving from the
+router's MAC, and SYN-ACKs going straight out). Add the route on the
+desktop (`route -p add` keeps it), or let the router pass traffic in and
+out of the same interface without tracking its state.
+
 ## 9. When it doesn't
 
 | Where | Shows |
