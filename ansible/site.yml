@@ -169,6 +169,7 @@
         ccnix_settings:
           - { section: gateway, key: mode, value: '"{{ ccnix_gateway_mode }}"' }
           - { section: gateway, key: networks, value: "[{{ ccnix_cc_networks | map('to_json') | join(', ') }}]" }
+          - { section: gateway, key: sourceCheck, value: "{{ ccnix_source_check | bool | lower }}" }
           - { section: gateway, key: address, value: '"{{ ccnix_gateway_address }}"' }
           - { section: gateway, key: channel, value: "{{ ccnix_gateway_channel }}" }
           - { section: gateway, key: mac, value: '"{{ ccnix_gateway_mac }}"' }

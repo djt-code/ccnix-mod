@@ -11,6 +11,9 @@ Environment=TABLE={{ ccnix_tun_table }}
 {% if ccnix_forward %}
 Environment=FORWARD=1
 {% endif %}
+{% if not ccnix_tun_source_filter | bool %}
+Environment=SRCFILTER=0
+{% endif %}
 {% if ccnix_nat %}
 Environment=NAT={{ ccnix_nat }}
 {% endif %}

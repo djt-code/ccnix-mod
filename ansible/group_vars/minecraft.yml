@@ -41,6 +41,12 @@ ccnix_tun_device: ccnix0
 ccnix_tun_table: 4040
 ccnix_forward: true             # the server routes between CC's networks and its LAN
 ccnix_nat: ""                   # an uplink name (eth0) to masquerade CC's networks out of it
+# BCP 38, CC computers forging sources: the mod drops a packet from CC
+# whose source isn't the gateway's network or a ccnix_cc_networks one, in
+# both modes (gateway.sourceCheck), and in TUN mode the host does too, with
+# an iptables chain on the device (ccnix-tun-setup's SRCFILTER).
+ccnix_source_check: true
+ccnix_tun_source_filter: true
 
 # Who owns the gateway's routes.  ccnix_op_routes: ops may change them in
 # game (/ccnix route add|del), within ccnix_cc_networks and no larger

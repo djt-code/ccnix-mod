@@ -70,6 +70,9 @@ public final class Service {
         }
         var carried = vlans();
         run(g -> g.configureVlans(carried));
+        var sources = sources();
+        boolean check = Config.SOURCE_CHECK.get();
+        run(g -> g.configureSources(check, sources));
         for (var p : PORTS) run(g -> g.addPort(p));
         exec.scheduleAtFixedRate(() -> run(Gateway::tick), 250, 250, TimeUnit.MILLISECONDS);
         if (!PORTS.isEmpty() && mode.equals("tun")) startTun();
@@ -108,6 +111,9 @@ public final class Service {
         run(g -> g.configure(s));
         var carried = vlans();
         run(g -> g.configureVlans(carried));
+        var sources = sources();
+        boolean check = Config.SOURCE_CHECK.get();
+        run(g -> g.configureSources(check, sources));
         var n = nat;
         if (n != null) {
             var c = natConfig();
@@ -129,6 +135,16 @@ public final class Service {
     /** The running mode: "nat" or "tun". */
     public static String mode() {
         return mode;
+    }
+
+    /** The CC networks (gateway.networks) a packet from CC may come from, besides the gateway's own network. */
+    private static List<NatConfig.Net> sources() {
+        var out = new ArrayList<NatConfig.Net>();
+        for (var s : Config.NETWORKS.get()) {
+            var n = NatConfig.net(s);
+            if (n != null) out.add(n);                  // (natConfig() says what's wrong with the rest)
+        }
+        return out;
     }
 
     /** NAT mode's settings from the config (what can't be used is logged and left out). */

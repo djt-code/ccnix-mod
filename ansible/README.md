@@ -52,7 +52,9 @@ ansible/run-on-host.sh devserver server-bundle.tar.gz --check --diff
 - **`ccnix-tun.service`** (root, oneshot, TUN mode) makes the device at
   boot with `ccnix-tun-setup`, before the server: its address, routes into
   it (`ccnix_cc_networks`, in table `ccnix_tun_table`, after the host's own
-  routes), forwarding (`ccnix_forward`), NAT (`ccnix_nat`). In NAT mode the
+  routes), forwarding (`ccnix_forward`), NAT (`ccnix_nat`), the source filter
+  (`ccnix_tun_source_filter`: an iptables chain dropping forged sources out
+  of the device; the mod's own is `ccnix_source_check`). In NAT mode the
   unit is stopped and disabled, and `ccnix-tun-setup --remove` takes the
   device, table and rules down.
 - **`minecraft.service`** runs `run.sh nogui` in a tmux session, and stops

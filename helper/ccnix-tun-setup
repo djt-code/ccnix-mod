@@ -28,6 +28,11 @@
 #                   CC's networks (through the gateway) and its own
 #   NAT=eth0        and masquerade CC's networks going out of eth0, so
 #                   the real network needn't know about them (FORWARD too)
+#   SRCFILTER=1     BCP 38: drop what comes out of the device from a source
+#                   that isn't ADDRESS's network or a NETWORK (iptables
+#                   chain DEVICE-src, from INPUT and FORWARD); 0 takes it
+#                   away.  The mod drops those too (gateway.sourceCheck):
+#                   this is the host's own line, should that be off
 #
 #   ccnix-tun-setup minecraft 10.0.0.1/24 10.1.0.0/16
 #   NAT=eth0 ccnix-tun-setup minecraft 10.0.0.1/24 10.1.0.0/16 10.2.0.0/16
@@ -36,17 +41,23 @@
 set -e
 
 if [ $# -lt 1 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-    sed -n '2,35s/^# \{0,1\}//p' "$0"
+    sed -n '2,40s/^# \{0,1\}//p' "$0"
     exit 2
 fi
 if [ "$1" = "--remove" ]; then
     dev=${DEVICE:-ccnix0}
     table=${TABLE:-4040}
     ip link del "$dev" 2>/dev/null || true
+    if command -v iptables >/dev/null 2>&1; then
+        for c in INPUT FORWARD; do
+            while iptables -D "$c" -i "$dev" -j "$dev-src" 2>/dev/null; do :; done
+        done
+        iptables -F "$dev-src" 2>/dev/null && iptables -X "$dev-src" || true
+    fi
     ip route flush table "$table" 2>/dev/null || true
     while ip rule del pref "$table" 2>/dev/null; do :; done
     while ip rule del pref $((table + 1)) 2>/dev/null; do :; done
-    echo "$dev: removed, with table $table and its rules (forwarding and masquerading left as they were)"
+    echo "$dev: removed, with table $table, its rules and the $dev-src chain (forwarding and masquerading left as they were)"
     exit 0
 fi
 user=$1
@@ -80,4 +91,27 @@ if [ -n "$NAT" ]; then
     done
 fi
 
-echo "$dev: $addr, for $user${*:+; routes $* (table $table)}${NAT:+; masquerading out of $NAT}"
+# BCP 38: only CC's own sources out of the device (the chain says which)
+chain="$dev-src"
+filter=""
+if command -v iptables >/dev/null 2>&1; then
+    for c in INPUT FORWARD; do
+        while iptables -D "$c" -i "$dev" -j "$chain" 2>/dev/null; do :; done
+    done
+    iptables -F "$chain" 2>/dev/null && iptables -X "$chain" || true
+    if [ "${SRCFILTER:-1}" != 0 ]; then
+        iptables -N "$chain"
+        for net in "$addr" "$@"; do
+            iptables -A "$chain" -s "$net" -j RETURN
+        done
+        iptables -A "$chain" -j DROP
+        for c in INPUT FORWARD; do
+            iptables -I "$c" -i "$dev" -j "$chain"
+        done
+        filter="; sources filtered ($chain)"
+    fi
+elif [ "${SRCFILTER:-1}" != 0 ]; then
+    echo "$dev: no iptables, so the host doesn't filter CC's sources (the mod's gateway.sourceCheck still does)" >&2
+fi
+
+echo "$dev: $addr, for $user${*:+; routes $* (table $table)}${NAT:+; masquerading out of $NAT}$filter"

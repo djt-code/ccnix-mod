@@ -298,6 +298,25 @@ class GatewayTest {
     }
 
     @Test
+    void forgedSourcesAreDropped() {
+        g.configureSources(true, List.of(NatConfig.net("10.1.0.0/16")));
+        for (var src : List.of("10.0.0.5", "10.1.2.3")) g.fromCc(lan, CH, frame("5:back", "gateway", "ip", ping(src, "8.8.8.8")));
+        assertEquals(2, tun.size(), "the gateway's network and gateway.networks go on");
+        var forged = List.of("192.168.1.50", "10.2.0.1", "10.0.0.1", "10.0.0.255", "0.0.0.1", "127.0.0.1", "224.0.0.5",
+            "255.255.255.255");
+        for (var src : forged) g.fromCc(lan, CH, frame("5:back", "gateway", "ip", ping(src, "8.8.8.8")));
+        g.fromCc(lan, CH, frame("5:back", "*", "ip", ping("192.168.1.50", "10.0.0.255")));
+        assertEquals(2, tun.size(), "another network, the gateway's own address or broadcast, a martian: dropped");
+        assertEquals(9, g.spoofed);
+        assertEquals(9, g.dropped);
+        assertTrue(g.status().stream().anyMatch(l -> l.contains("9 dropped (9 with a forged source)")), g.status().toString());
+        g.configureSources(false, List.of());
+        g.fromCc(lan, CH, frame("5:back", "gateway", "ip", ping("192.168.1.50", "8.8.8.8")));
+        assertEquals(3, tun.size(), "sourceCheck off: anything goes on");
+        assertTrue(g.status().stream().anyMatch(l -> l.contains("sourceCheck is off")));
+    }
+
+    @Test
     void oneMessageHeardTwiceCountsOnce() {
         var f = frame("5:back", "gateway", "ip", ping("10.0.0.5", "8.8.8.8"));
         g.fromCc(lan, CH, f);

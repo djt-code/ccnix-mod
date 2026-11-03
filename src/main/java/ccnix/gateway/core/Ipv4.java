@@ -277,6 +277,11 @@ public final class Ipv4 {
     // Helpers
     // ---------------------------------------------------------------------------------------------------------------
 
+    /** The source address of a packet at least 20 bytes long. */
+    public static long src(byte[] p) {
+        return u32(p, 12);
+    }
+
     /** The destination address of a packet at least 20 bytes long. */
     public static long dst(byte[] p) {
         return u32(p, 16);

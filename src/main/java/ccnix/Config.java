@@ -30,6 +30,13 @@ public final class Config {
             "inside one. In TUN mode give helper/ccnix-tun-setup the same list.")
         .defineListAllowEmpty("networks", List.of("10.1.0.0/16"), () -> "10.1.0.0/16", o -> o instanceof String);
 
+    public static final ModConfigSpec.BooleanValue SOURCE_CHECK = BUILDER
+        .comment("BCP 38, in both modes: a packet from CC goes on only if its source is on the gateway's network or in",
+            "networks, and isn't the gateway's own address, its network's broadcast or one that can't be (0.x, 127.x,",
+            "224.x and up). The rest are dropped before the server sees them (TUN mode) or anything is translated",
+            "(NAT mode). Off, CC computers can forge any source: in TUN mode only the host's firewall stops them.")
+        .define("sourceCheck", true);
+
     public static final ModConfigSpec.ConfigValue<String> ADDRESS = BUILDER
         .comment("The gateway's address and its network, a.b.c.d/len. Routers on the gateway's cable take addresses",
             "on this network (ip addr add back 10.0.0.2/24) and route at this one (ip route add default via",

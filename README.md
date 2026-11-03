@@ -191,6 +191,10 @@ it, end to end.
    - `FORWARD=1` lets the server route between CC's networks and its own.
    - `NAT=eth0` also masquerades CC's networks going out of `eth0`. With it, CC computers can reach the real
      network without anything else knowing about them.
+   - It drops whatever comes out of the device from a source that isn't the gateway's network or one of the
+     networks given (BCP 38: an iptables chain, `ccnix0-src`, from INPUT and FORWARD), so a CC computer can't send
+     forged packets out of the host. The mod drops those first (`gateway.sourceCheck`); this is the host's own line.
+     `SRCFILTER=0` leaves it out.
    - The device goes when the machine reboots, so run the script at every boot. A systemd unit:
 
    ```ini
@@ -218,6 +222,7 @@ it, end to end.
    |---|---|---|
    | `gateway.mode` | `nat` | `nat` or `tun` (above). |
    | `gateway.networks` | `["10.1.0.0/16"]` | The CC networks behind routers that the gateway carries; every route must be inside one. In TUN mode, give `ccnix-tun-setup` the same. |
+   | `gateway.sourceCheck` | `true` | BCP 38, both modes: a packet from CC goes on only if its source is on the gateway's network or in `gateway.networks` (and isn't the gateway's own address, its broadcast, `0.x`, `127.x` or `224.x` and up). The rest are dropped before the server sees them, or in NAT mode before anything is translated, and counted in `/ccnix`. Off, CC computers can forge any source, and in TUN mode only the host's firewall stops them. |
    | `gateway.address` | `10.0.0.1/24` | The gateway's address and its network. In TUN mode, use the device's address. |
    | `gateway.channel` | `4040` | The modem channel: 4040 is ccnix's untagged network, 4040 + n is VLAN n. |
    | `gateway.mac` | `gateway` | Its MAC on the CC network. |

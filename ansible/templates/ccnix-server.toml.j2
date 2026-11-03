@@ -1,6 +1,7 @@
 [gateway]
 	mode = "{{ ccnix_gateway_mode }}"
 	networks = [{{ ccnix_cc_networks | map('to_json') | join(', ') }}]
+	sourceCheck = {{ ccnix_source_check | bool | lower }}
 	address = "{{ ccnix_gateway_address }}"
 	channel = {{ ccnix_gateway_channel }}
 	mac = "{{ ccnix_gateway_mac }}"

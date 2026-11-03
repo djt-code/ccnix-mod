@@ -65,6 +65,7 @@ final class CcWorld {
     private final ArrayDeque<byte[]> fromNat = new ArrayDeque<>();
     final ConcurrentLinkedQueue<Runnable> posted = new ConcurrentLinkedQueue<>();
     final Nat nat;
+    private final List<NatConfig.Net> sources;
 
     CcWorld(Settings settings) throws Exception {
         this(settings, null, null);
@@ -91,6 +92,15 @@ final class CcWorld {
             gateway = new Gateway(settings, nat, () -> Math.round(now * 1000));
             nat.attach(fromNat::add);
         }
+        // (gateway.networks, as Service gives it: the config's default in TUN mode)
+        sources = cfg == null ? List.of(NatConfig.net("10.1.0.0/16")) : cfg.networks();
+        gateway.configureSources(true, sources);
+    }
+
+    /** gateway.sourceCheck off, or on again. */
+    CcWorld sourceCheck(boolean on) {
+        gateway.configureSources(on, sources);
+        return this;
     }
 
     private LuaFunction load(InputStream in, String name) throws Exception {

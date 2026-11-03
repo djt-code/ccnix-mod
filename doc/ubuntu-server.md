@@ -100,6 +100,7 @@ NAT=eth0 ccnix-tun-setup minecraft 10.0.0.1/24 10.1.0.0/16
 ip -br addr show ccnix0                  # UNKNOWN 10.0.0.1/24
 ip route show table 4040                 # 10.1.0.0/16 dev ccnix0
 ip rule | grep 404                       # main without its default route first, then table 4040
+iptables -S ccnix0-src                   # CC's own sources RETURN, the rest DROP (BCP 38)
 ```
 
 CC's networks are in a table of their own, after the VM's own routes, so

@@ -145,6 +145,39 @@ class NatTest {
     }
 
     @Test
+    void forgedSourcesAreNeverTranslated() throws Exception {
+        world();
+        var listener = new DatagramSocket(0, InetAddress.getLoopbackAddress());
+        open.add(listener);
+        listener.setSoTimeout(300);
+        // (A's frame, by hand: lib/net only sends from its own addresses)
+        String forge = """
+            H.out[#H.out + 1] = { 1, "back", 4040, { ccnet = 1, dst = "gateway", src = "1:back", type = "ip",
+                data = { src = N.parseIP("%s"), dst = N.parseIP("%s"), ttl = 64, id = 1, proto = "udp",
+                         data = { sport = 5000, dport = %d, data = "%s" } } } }
+            """;
+        w.lua(forge.formatted("192.0.2.66", FAR, listener.getLocalPort(), "forged"));
+        w.pump(1);
+        assertEquals(1, w.gateway.spoofed, "dropped at the gateway");
+        assertEquals(0, w.nat.opened + w.nat.dropped, "before NAT saw it");
+        assertThrows(java.net.SocketTimeoutException.class, () -> listener.receive(new DatagramPacket(new byte[64], 64)));
+
+        w.sourceCheck(false);
+        w.lua(forge.formatted("192.0.2.66", FAR, listener.getLocalPort(), "forged"));
+        w.pump(1);
+        assertEquals(1, w.nat.dropped, "sourceCheck off: NAT still won't translate a source that isn't CC's");
+        assertEquals(0, w.nat.opened);
+
+        w.sourceCheck(true);
+        w.lua(forge.formatted("10.0.0.5", FAR, listener.getLocalPort(), "real"));
+        w.pump(1);
+        var got = new DatagramPacket(new byte[64], 64);
+        listener.receive(got);
+        assertEquals("real", new String(got.getData(), 0, got.getLength(), StandardCharsets.UTF_8), "A's own address goes out");
+        assertEquals(1, w.gateway.spoofed);
+    }
+
+    @Test
     void tracerouteSeesTheGatewayAsAHopThenProhibited() throws Exception {
         world();
         w.lua("B.echo('8.8.8.8', 9, 1, 2); B.echo('8.8.8.8', 9, 2, 3)");   // (R takes one off: 1, then 2, at the gateway)

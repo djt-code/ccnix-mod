@@ -110,9 +110,13 @@ public final class Gateway {
     private final Object[] recent = new Object[RECENT];
     private int recentNext;
     private long nextHello;
+    private boolean sourceCheck = true;
+    private List<NatConfig.Net> sources = List.of();
 
     /** Packets from CC into the TUN device, from it into CC, dropped (unreadable, no route, no ARP answer). */
     public long toTun, toCc, dropped, arpAsked;
+    /** Of those dropped, from CC with a forged source ({@link #configureSources}). */
+    public long spoofed;
     /** Frames passed between blocks on the exchange and its VLANs. */
     public long relayed;
 
@@ -137,6 +141,26 @@ public final class Gateway {
     /** The VLANs any block may carry (VLAN 1 is the exchange): the server's list ({@link #vlans(String, List)}). */
     public void configureVlans(BitSet carried) {
         vlans = (BitSet) carried.clone();
+    }
+
+    /**
+     * BCP 38 (gateway.sourceCheck): when on, a packet from CC goes on only from a source on the gateway's network or
+     * in networks (gateway.networks), and not the gateway's own address, its network's broadcast or a martian.
+     */
+    public void configureSources(boolean on, List<NatConfig.Net> networks) {
+        sourceCheck = on;
+        sources = List.copyOf(networks);
+    }
+
+    /** May a packet from CC come from src? */
+    boolean sourceOk(long src) {
+        if (!sourceCheck) return true;
+        var s = settings;
+        long a = src >>> 24;
+        if (a == 0 || a == 127 || a >= 224 || src == s.ip() || src == s.broadcast()) return false;
+        if (s.onNetwork(src)) return true;
+        for (var n : sources) if (n.holds(src)) return true;
+        return false;
     }
 
     /** "1-4094", "10,20,100-199" or "" (none) as a set of VLANs; what can't be used is said in problems. */
@@ -309,6 +333,11 @@ public final class Gateway {
             long dst = Ipv4.dst(p);
             if (dst != Ipv4.ALL && dst != settings.broadcast()) return;
         }
+        if (!sourceOk(Ipv4.src(p))) {                   // (dropped silently: an ICMP error would go to the forged source)
+            dropped++;
+            spoofed++;
+            return;
+        }
         toTun++;
         tun.write(p);
     }
@@ -452,7 +481,8 @@ public final class Gateway {
         arp.forEach((ip, n) -> out.add("neighbour " + Ipv4.ipString(ip) + " is " + n.mac() + " ("
             + Math.max(0, (n.expires() - now) / 1000) + " s)"));
         waiting.forEach((ip, w) -> out.add("asking ARP for " + Ipv4.ipString(ip) + ": " + w.packets.size() + " waiting"));
-        out.add("packets: " + toTun + " from CC, " + toCc + " into CC, " + dropped + " dropped; " + arpAsked
+        out.add("packets: " + toTun + " from CC, " + toCc + " into CC, " + dropped + " dropped (" + spoofed
+            + " with a forged source" + (sourceCheck ? "" : "; sourceCheck is off") + "); " + arpAsked
             + " ARP requests; " + relayed + " frames passed between blocks");
         return out;
     }
