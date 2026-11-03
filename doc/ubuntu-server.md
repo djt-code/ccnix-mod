@@ -292,6 +292,11 @@ lines show on A and A's on the VM. The other way: on the VM `nc -l 7000`,
 on A `nc 10.0.0.1 7000`. And `nc 10.0.0.1 22` on A prints the VM's SSH
 banner.
 
+**HTTP from A.** On the VM: `python3 -m http.server 8000`; on A:
+`curl -i http://10.0.0.1:8000/` (ccnix 0.10.0) prints the status line, the
+headers and the directory listing. ccnix's curl is a small HTTP-only one;
+curl itself is Daniel Stenberg's (https://curl.se).
+
 **Telnet into A.** On A:
 
 ```
