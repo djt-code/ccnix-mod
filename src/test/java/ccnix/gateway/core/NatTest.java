@@ -98,7 +98,7 @@ class NatTest {
     }
 
     void world(NatConfig cfg, boolean client) throws Exception {
-        var s = Settings.parse("10.0.0.1/24", 4040, "gateway", List.of("10.1.0.0/16 via 10.0.0.2"), new ArrayList<>());
+        var s = Settings.parse("10.0.0.1/24", Settings.DEFAULT_CHANNEL, "gateway", List.of("10.1.0.0/16 via 10.0.0.2"), new ArrayList<>());
         w = new CcWorld(s, cfg, real -> loopback(real, client));
         w.wire("lan", 1, "back").wire("lan", 3, "back").wire("far", 3, "left").wire("far", 2, "back");
         w.gatewayOn("lan");
@@ -152,7 +152,7 @@ class NatTest {
         listener.setSoTimeout(300);
         // (A's frame, by hand: lib/net only sends from its own addresses)
         String forge = """
-            H.out[#H.out + 1] = { 1, "back", 4040, { ccnet = 1, dst = "gateway", src = "1:back", type = "ip",
+            H.out[#H.out + 1] = { 1, "back", N.CHANNEL, { ccnet = 1, dst = "gateway", src = "1:back", type = "ip",
                 data = { src = N.parseIP("%s"), dst = N.parseIP("%s"), ttl = 64, id = 1, proto = "udp",
                          data = { sport = 5000, dport = %d, data = "%s" } } } }
             """;

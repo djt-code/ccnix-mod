@@ -9,7 +9,7 @@ import java.util.List;
  */
 public record Settings(long ip, int prefix, int channel, String mac, List<Route> routes) {
     public static final String DEFAULT_ADDRESS = "10.0.0.1/24";
-    public static final int DEFAULT_CHANNEL = 4040;
+    public static final int DEFAULT_CHANNEL = 60000;
     public static final String DEFAULT_MAC = "gateway";
 
     /** net/prefix via gw. */

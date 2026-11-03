@@ -29,7 +29,7 @@ ccnix_bundle: "{{ playbook_dir }}/../server-bundle.tar.gz"
 # The mod's own default is nat; this host has the TUN device, so tun.
 ccnix_gateway_mode: tun
 ccnix_gateway_address: 10.0.0.1/24
-ccnix_gateway_channel: 4040
+ccnix_gateway_channel: 60000     # ccnix's net.CHANNEL (4040 before ccnix 0.7.0)
 ccnix_gateway_mac: gateway
 ccnix_gateway_routes: ["10.1.0.0/16 via 10.0.0.2"]   # CC networks behind CC routers
 # The CC networks the gateway carries, in both modes (gateway.networks):

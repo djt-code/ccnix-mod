@@ -137,7 +137,7 @@ own (Java sockets), carried byte for byte, and the gateway answers ping at its a
  CC host 10.0.0.5 ─┐
                    ├─ cable ─ [Network Gateway] ··· ccnix-tun ─ ccnix0 (10.0.0.1) ─ the server's kernel ─ eth0
  CC router 10.0.0.2┘   10.0.0.1, MAC "gateway",     (helper,
-   └ 10.1.0.0/16 behind it   channel 4040         no privileges)
+   └ 10.1.0.0/16 behind it   channel 60000        no privileges)
 ```
 
 #### How it works
@@ -224,7 +224,7 @@ it, end to end.
    | `gateway.networks` | `["10.1.0.0/16"]` | The CC networks behind routers that the gateway carries; every route must be inside one. In TUN mode, give `ccnix-tun-setup` the same. |
    | `gateway.sourceCheck` | `true` | BCP 38, both modes: a packet from CC goes on only if its source is on the gateway's network or in `gateway.networks` (and isn't the gateway's own address, its broadcast, `0.x`, `127.x` or `224.x` and up). The rest are dropped before the server sees them, or in NAT mode before anything is translated, and counted in `/ccnix`. Off, CC computers can forge any source, and in TUN mode only the host's firewall stops them. |
    | `gateway.address` | `10.0.0.1/24` | The gateway's address and its network. In TUN mode, use the device's address. |
-   | `gateway.channel` | `4040` | The modem channel: 4040 is ccnix's untagged network, 4040 + n is VLAN n. |
+   | `gateway.channel` | `60000` | The modem channel: 60000 is ccnix's untagged network, 60000 + n is VLAN n (up to 64094). It has to match ccnix's `net.CHANNEL`; before ccnix 0.7.0 that was 4040. |
    | `gateway.mac` | `gateway` | Its MAC on the CC network. |
    | `gateway.routes` | `[]` | Networks behind CC routers: `["10.1.0.0/16 via 10.0.0.2"]`. The longest match wins. |
    | `gateway.opRoutes` | `false` | Ops may change the routes in game (`/ccnix route add\|del`). Always on in singleplayer, where the player is the admin. |

@@ -1,5 +1,6 @@
 package ccnix;
 
+import ccnix.gateway.core.Gateway;
 import ccnix.gateway.core.NatConfig;
 import ccnix.gateway.core.Settings;
 import net.neoforged.neoforge.common.ModConfigSpec;
@@ -45,8 +46,9 @@ public final class Config {
         .define("address", Settings.DEFAULT_ADDRESS);
 
     public static final ModConfigSpec.IntValue CHANNEL = BUILDER
-        .comment("The modem channel: 4040 is ccnix's network untagged, 4040 + n is VLAN n.")
-        .defineInRange("channel", Settings.DEFAULT_CHANNEL, 0, 65535);
+        .comment("The modem channel: 60000 is ccnix's network untagged, 60000 + n is VLAN n (ccnix's lib/net has",
+            "60000; at most 61441, so VLAN 4094 still has a channel).")
+        .defineInRange("channel", Settings.DEFAULT_CHANNEL, 0, 65535 - Gateway.VLAN_MAX);
 
     public static final ModConfigSpec.ConfigValue<String> MAC = BUILDER
         .comment("The gateway's MAC on the CC network (CC's are \"<computer id>:<interface>\").")

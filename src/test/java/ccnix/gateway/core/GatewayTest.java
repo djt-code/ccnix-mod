@@ -11,7 +11,7 @@ import static ccnix.gateway.core.Ipv4Test.t;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GatewayTest {
-    static final int CH = 4040;
+    static final int CH = Settings.DEFAULT_CHANNEL;
 
     static final class Port implements Gateway.Port {
         final List<Map<String, Object>> sent = new ArrayList<>();

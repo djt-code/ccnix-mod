@@ -208,7 +208,7 @@ the server runs.
     mode = "tun"                               # the VM's TUN device (section 3)
     networks = ["10.1.0.0/16"]                 # the CC networks: routes must be inside
     address = "10.0.0.1/24"
-    channel = 4040
+    channel = 60000
     mac = "gateway"
     routes = ["10.1.0.0/16 via 10.0.0.2"]      # the CC router below
     opRoutes = true                            # ops may /ccnix route add|del
@@ -250,7 +250,7 @@ ping 10.0.0.1                the VM answers: it's the gateway's address on ccnix
 On the VM: `ping 10.0.0.2` answers from R. `/ccnix` in game shows the
 gateway's blocks, R as a neighbour, and packets carried. If `ping` says
 "host unreachable": R's `ip neigh` has no `gateway`; check the cable touches
-both the modem and the gateway block, and the channel is 4040 on both.
+both the modem and the gateway block, and the channel is 60000 on both (ccnix 0.7.0 and ccnix-mod 0.13.0 or later; 4040 before).
 
 ## 8. In game: a VLAN behind R
 

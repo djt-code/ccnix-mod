@@ -77,6 +77,11 @@ public final class Service {
         exec.scheduleAtFixedRate(() -> run(Gateway::tick), 250, 250, TimeUnit.MILLISECONDS);
         if (!PORTS.isEmpty() && mode.equals("tun")) startTun();
         LOG.info("ccnix: the gateway runs in {} mode", mode);
+        if (s.channel() == 4040) {
+            LOG.warn("ccnix: gateway.channel is 4040, ccnix's channel before 0.7.0: computers on the ROM's ccnix use {}"
+                + " now, so set gateway.channel = {} in config/ccnix-server.toml", Settings.DEFAULT_CHANNEL,
+                Settings.DEFAULT_CHANNEL);
+        }
     }
 
     public static synchronized void stop() {
