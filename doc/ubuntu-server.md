@@ -321,5 +321,6 @@ Windows `route add 10.0.0.0 mask 255.0.0.0 <vm address>`; then `telnet
 | server log | `ccnix:` lines: the ROM, the helper starting, its messages |
 | R: `router` | each interface's frames, routes, forwarded/dropped, "no ARP answer" and such |
 | a host: `ip`, `ip neigh` | what's set, whether it's up, who ARP has found |
+| a CC computer: `tcpdump -n` (ccnix 0.5.0) | every frame on its wire, in and out: ARP, ICMP, UDP, TCP flags and sequence numbers (`tcpdump -n icmp or arp`, `-e` for MACs and VLANs) |
 | VM: `ip -br addr show ccnix0`, `ip route`, `tcpdump -ni ccnix0` | the device, the routes into it, the packets actually crossing |
 | `ping` says | "net unreachable": a router lacks a route; "administratively prohibited": a filter, or a NAT-mode gateway (no ICMP past it; it answers ping itself); "host unreachable": no ARP answer (address wrong, or not up); "time to live exceeded": a routing loop |
