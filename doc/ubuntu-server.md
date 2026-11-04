@@ -315,6 +315,32 @@ password, and A's shell is on your terminal with ANSI colours; `exit`
 leaves. `set telnetd.attach console` on A shows A's own screen instead
 (a miner's, say).
 
+**A's log on the VM** (ccnix 0.14.0). ccnix's syslogd forwards as RFC
+5424 over UDP 514, which rsyslog takes as it is. On the VM, a file
+`/etc/rsyslog.d/10-ccnix.conf`:
+
+```
+module(load="imudp")
+input(type="imudp" port="514" address="10.0.0.1")
+if $fromhost-ip startswith "10." then {
+    action(type="omfile" file="/var/log/ccnix.log")
+    stop
+}
+```
+
+then `sudo systemctl restart rsyslog` (and let UDP 514 in on `ccnix0` if
+a firewall is on). On A, `setup init` has syslogd running; an
+`/etc/syslog.conf` replaces the default rules, so copy them from `help
+syslog` and add a line:
+
+```
+*.info                                          @10.0.0.1
+```
+
+then `service restart syslogd` and `logger hello from A`: on the VM,
+`tail /var/log/ccnix.log` shows it under A's label, and so does what A's
+services print, telnetd's logins and httpd's requests.
+
 **From your desktop**, not just the VM: `FORWARD=1` (or `NAT`) in the setup
 script, and on the desktop a route to CC's networks through the VM, e.g.
 Windows `route add 10.0.0.0 mask 255.0.0.0 <vm address>`; then `telnet
