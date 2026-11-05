@@ -106,6 +106,13 @@ iptables -S ccnix0-src                   # CC's own sources RETURN, the rest DRO
 CC's networks are in a table of their own, after the VM's own routes, so
 they can't take its LAN or its gateway away from it.
 
+If the two rules are missing (the table is there, but the VM sends CC's
+networks out of its default route), systemd-networkd took them: it deletes
+rules it didn't make whenever it starts, and needrestart restarts it after
+some upgrades. The playbook stops that with
+`/etc/systemd/networkd.conf.d/ccnix.conf` (`ManageForeignRoutingPolicyRules=no`);
+`systemctl restart ccnix-tun` puts them back.
+
 It goes at reboot; this unit remakes it before the server
 (`systemctl enable --now ccnix-tun`):
 

@@ -18,7 +18,9 @@
 # the host's own routes (all but its default route: the rule "lookup main
 # suppress_prefixlength 0" comes first).  So a network here can never take
 # the host's LAN, its gateway or any route it has: it only stands in for
-# the default route, for the addresses in it.
+# the default route, for the addresses in it.  systemd-networkd deletes
+# rules it didn't make when it starts: run this again after, or give it
+#   ManageForeignRoutingPolicyRules=no   (in /etc/systemd/networkd.conf.d)
 #
 # From the environment:
 #   DEVICE=ccnix0   the device's name (the mod's tun.device)
@@ -42,7 +44,7 @@
 set -e
 
 if [ $# -lt 1 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-    sed -n '2,41s/^# \{0,1\}//p' "$0"
+    sed -n '2,43s/^# \{0,1\}//p' "$0"
     exit 2
 fi
 

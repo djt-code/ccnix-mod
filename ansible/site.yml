@@ -56,6 +56,26 @@
         mode: "0644"
       notify: Restart ccnix-tun
 
+    # systemd-networkd drops rules it didn't make whenever it starts, and
+    # needrestart restarts it after some upgrades: the table's two rules
+    # went with it, so the host stopped routing into the device
+    - name: networkd leaves the rules alone (TUN mode)
+      ansible.builtin.copy:
+        dest: /etc/systemd/networkd.conf.d/ccnix.conf
+        content: |
+          # {{ ansible_managed }}
+          # ccnix-tun-setup's policy rules (priorities {{ ccnix_tun_table }} and {{ ccnix_tun_table | int + 1 }}) aren't networkd's
+          [Network]
+          ManageForeignRoutingPolicyRules=no
+        mode: "0644"
+      when: ccnix_gateway_mode == "tun"
+
+    - name: networkd as it was (NAT mode)
+      ansible.builtin.file:
+        path: /etc/systemd/networkd.conf.d/ccnix.conf
+        state: absent
+      when: ccnix_gateway_mode == "nat"
+
     - name: The TUN device, now and at every boot (TUN mode)
       ansible.builtin.systemd_service:
         name: ccnix-tun
