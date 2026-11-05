@@ -63,7 +63,7 @@
       ansible.builtin.copy:
         dest: /etc/systemd/networkd.conf.d/ccnix.conf
         content: |
-          # {{ ansible_managed }}
+          # From ccnix-mod's playbook (ansible/site.yml)
           # ccnix-tun-setup's policy rules (priorities {{ ccnix_tun_table }} and {{ ccnix_tun_table | int + 1 }}) aren't networkd's
           [Network]
           ManageForeignRoutingPolicyRules=no
