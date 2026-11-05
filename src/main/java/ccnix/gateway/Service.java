@@ -300,7 +300,10 @@ public final class Service {
         var s = settings();
         var out = new ArrayList<String>();
         out.add("on the exchange: the gateway is " + s.address() + " (" + mode + " mode), channel " + s.channel());
-        out.add("VLANs the server carries: " + Gateway.says(vlans()) + " (VLAN 1 is the exchange, untagged)");
+        out.add("VLANs the server carries: " + Gateway.says(vlans()) + " (VLAN 1 is always the exchange)");
+        int nat = p.nativeVlan();
+        out.add("untagged on this block's cable: " + (nat == 0 ? "nothing (native none: every VLAN tagged)"
+            : nat == 1 ? "VLAN 1, the exchange" : "VLAN " + nat + " (the exchange is tagged, as back.1)"));
         try {
             out.addAll(e.submit(() -> g.portStatus(p)).get(2, TimeUnit.SECONDS));
         } catch (Exception ex) {

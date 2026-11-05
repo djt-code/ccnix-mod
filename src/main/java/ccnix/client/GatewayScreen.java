@@ -73,7 +73,7 @@ public final class GatewayScreen extends Screen {
             g.drawString(font, line, left, y, 0xC0C0C0);
             y += LINE;
         }
-        g.drawString(font, "VLANs this block carries (1 is the exchange):", left, controls, 0xE0E0E0);
+        g.drawString(font, "VLANs this block carries (VLAN 1 is always the exchange):", left, controls, 0xE0E0E0);
         g.drawString(font, "\"1-4094\" all, \"2-4094\" a trunk without the exchange, \"1,10,20-29\"", left, controls + 33, 0xA0A0A0);
         g.drawString(font, "Native (untagged) VLAN, a number or \"none\":", left, controls + 53, 0xE0E0E0);
         if (!data.canEdit()) {

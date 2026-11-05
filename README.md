@@ -98,7 +98,8 @@ was last heard on, a broadcast to all of them; `gateway.vlans` (all by default) 
 - **IDs and owners.** Each block gets an ID when placed, and remembers who placed it. A player may have
   `gateway.maxPerPlayer` (5) placed; `/ccnix gateways` lists them all.
 - **Right-click** one with an empty hand for its dialog: its ID and owner, frames in and out (and filtered), the MACs
-  heard behind it, the VLANs seen, whether it stands by, and its VLANs.
+  heard behind it, the VLANs seen, whether it stands by, what goes untagged on its cable, and its VLANs (VLAN 1 is
+  always the exchange).
 - **Each block's VLANs** (in its dialog; its owner's to change, or an op's), as a trunk port's: the VLANs it carries
   (`"1-4094"`, the default; `"2-4094"` a trunk with no way onto the exchange or to the gateway; `"1,10,20-29"`) and
   its native VLAN (a number in that list, or `none` to drop untagged frames). With a native VLAN other than 1, the
