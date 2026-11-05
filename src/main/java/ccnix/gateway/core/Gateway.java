@@ -262,11 +262,13 @@ public final class Gateway {
         var s = settings;
         int tag = channel - s.channel();
         if (tag < 0 || tag > VLAN_MAX) return;
-        if (!(payload instanceof Map<?, ?> f) || seen(payload)) return;
+        if (!(payload instanceof Map<?, ?> f)) return;
+        var stats = ports.get(port);
+        // (a block standing by mustn't mark a frame seen: the working block on its network hears the same one)
+        if (stats == null || standby.containsKey(port) || seen(payload)) return;
         if (!(f.get("ccnet") instanceof Number n) || n.doubleValue() != 1) return;
         if (!(f.get("src") instanceof String src) || !(f.get("dst") instanceof String dst)) return;
-        var stats = ports.get(port);
-        if (stats == null || standby.containsKey(port) || src.equals(s.mac())) return;
+        if (src.equals(s.mac())) return;
         int vlan = tag == 0 ? port.nativeVlan() : tag == port.nativeVlan() ? 0 : tag;
         if (vlan == 0 || !vlans.get(vlan) || !port.carries(vlan)) {
             stats.filtered++;

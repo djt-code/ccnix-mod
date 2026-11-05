@@ -222,6 +222,23 @@ class GatewayTest {
     }
 
     @Test
+    void aFrameTheSpareHearsFirstStillGoesThroughTheWorkingBlock() {
+        var third = new Port();                         // (a spare on lan's network)
+        g.addPort(third);
+        g.heard(lan, third);
+        assertSame(lan, g.standingBy(third));
+        // CC hands one modem message to every block on the cable, the same object: the spare may get it first
+        var question = arpRequest(mac(3), "10.0.0.2", "10.0.0.1");
+        g.fromCc(third, CH, question);
+        assertEquals(0, lan.sent.size() + other.sent.size(), "the spare carries nothing");
+        g.fromCc(lan, CH, question);
+        assertEquals(1, lan.sent.size(), "the working block still answers it (the gateway's ARP reply)");
+        assertEquals(List.of(question), other.sent, "and carries it across the exchange");
+        g.fromCc(lan, CH, question);
+        assertEquals(1, lan.sent.size(), "heard twice by working blocks, it still counts once");
+    }
+
+    @Test
     void apartAgainWhenTheBeaconsStop() {
         var third = new Port();
         g.addPort(third);
