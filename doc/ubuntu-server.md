@@ -254,8 +254,11 @@ there too):
 ip addr add back 10.0.0.2/24
 ip route add default via 10.0.0.1
 router boot                  routing from every boot; this shows the screen (q leaves it)
-ping 10.0.0.1                the VM answers: it's the gateway's address on ccnix0
+ping -c 4 10.0.0.1           the VM answers: it's the gateway's address on ccnix0
 ```
+
+(ccnix's `ping` keeps going until Ctrl+T, as Linux's does, and then prints
+the summary; `-c 4` stops after four.)
 
 On the VM: `ping 10.0.0.2` answers from R. `/ccnix` in game shows the
 gateway's blocks, R as a neighbour, and packets carried. If `ping` says
@@ -280,10 +283,10 @@ cable, the gateway's included.)
  B: the same with 10.1.0.7
 ```
 
-Test the inside first, from A: `ping 10.1.0.1` (R), `ping 10.0.0.2` (R's
-other side), `ping 10.0.0.1` (the VM, through R and the gateway: ttl=62),
-`traceroute 10.0.0.1` (10.1.0.1, then 10.0.0.1). With NAT on: `ping
-1.1.1.1`.
+Test the inside first, from A (each `ping` with `-c 4`, or Ctrl+T to stop
+it): `ping 10.1.0.1` (R), `ping 10.0.0.2` (R's other side), `ping
+10.0.0.1` (the VM, through R and the gateway: ttl=62), `traceroute
+10.0.0.1` (10.1.0.1, then 10.0.0.1). With NAT on: `ping 1.1.1.1`.
 
 Then from the VM:
 
