@@ -317,8 +317,7 @@ curl itself is Daniel Stenberg's (https://curl.se). The other way: on A,
 **Telnet into A.** On A:
 
 ```
-set telnetd.password pick-one
-set init.boot true
+sysctl telnetd.password=pick-one init.boot=true
 service add telnetd telnetd
 service enable telnetd
 reboot
@@ -327,7 +326,7 @@ reboot
 (`wget run https://raw.githubusercontent.com/djt-code/ccnix/main/deploy/setup.lua telnetd`
 does the same, HTTP being on.) From the VM: `telnet 10.1.0.6`, the
 password, and A's shell is on your terminal with ANSI colours; `exit`
-leaves. `set telnetd.attach console` on A shows A's own screen instead
+leaves. `sysctl telnetd.attach=console` on A shows A's own screen instead
 (a miner's, say).
 
 **A's log on the VM** (ccnix 0.14.0). ccnix's syslogd forwards as RFC
