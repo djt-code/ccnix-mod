@@ -325,3 +325,20 @@ clone. With the submodule not checked out, the build uses the ccnix repo this is
   shares the server's address, and the server would refuse an ICMP from its own address. (NAT mode sends its own:
   administratively prohibited, port unreachable, time exceeded.)
 - **IPv4 only**, and one gateway per server.
+
+## Credits
+
+Built on [CC: Tweaked](https://tweaked.cc/) (the CC: Tweaked developers; ComputerCraft by Daniel Ratcliffe) and
+[NeoForge](https://neoforged.net/). The ROM includes [etlua](https://github.com/leafo/etlua) by Leaf Corcoran (MIT).
+The Gradle build started from NeoForge's 1.21.1 ModDevGradle MDK, whose template files are MIT: see [NOTICE](NOTICE).
+
+## License
+
+BSD 3-Clause (see [LICENSE](LICENSE)), except the MDK's template files ([NOTICE](NOTICE)). The ROM it packs is
+ccnix, which is BSD 3-Clause except for the third-party parts its README lists.
+
+## Trademarks
+
+ccnix is an independent project. NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR
+MICROSOFT. It is not affiliated with or endorsed by the CC: Tweaked or ComputerCraft developers or the NeoForged
+project. Minecraft, ComputerCraft, CC: Tweaked and NeoForge are the names of their respective owners.

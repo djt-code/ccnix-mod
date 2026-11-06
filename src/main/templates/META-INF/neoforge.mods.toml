@@ -7,6 +7,7 @@ modId="${mod_id}"
 version="${mod_version}"
 displayName="${mod_name}"
 authors="Dan Theisen"
+credits="Built on CC: Tweaked (the CC: Tweaked developers; ComputerCraft by Daniel Ratcliffe) and NeoForge. The ROM includes etlua by Leaf Corcoran (MIT)."
 description='''
 ccnix, a small Unix-like distribution for CC: Tweaked, in every computer's ROM, updated with git; and a block that joins ComputerCraft's wired network to a real one: computers running ccnix's network stack reach real IPv4 hosts, and real hosts reach them, through a TUN device on the server.
 '''

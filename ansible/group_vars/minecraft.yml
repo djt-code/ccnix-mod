@@ -12,6 +12,11 @@ minecraft_heap_max: 5G                     # the VM has 7 GB
 # every login failed with "Authentication servers are down".
 minecraft_jvm_options: ["-Djava.net.preferIPv4Stack=true"]
 minecraft_ports: ["25565/tcp", "24454/udp"]   # the game; Simple Voice Chat
+# true writes eula=true into eula.txt, which means you accept the Minecraft
+# EULA (https://aka.ms/MinecraftEULA): read it first.  Set it in your
+# host_vars or with -e minecraft_eula_accepted=true; false leaves eula.txt
+# alone (and the server won't start until it says true).
+minecraft_eula_accepted: false
 
 # server.properties keys to keep as given (the server writes the rest)
 server_properties:

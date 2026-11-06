@@ -134,6 +134,9 @@ WantedBy=multi-user.target
 
 ## 4. The server
 
+The `echo eula=true` below means you accept the Minecraft EULA
+(https://aka.ms/MinecraftEULA): read it first.
+
 ```sh
 # VM
 install -d -o minecraft -g minecraft /srv/minecraft/server

@@ -242,12 +242,17 @@
       when: cc_config.stat.exists
       notify: Restart minecraft
 
+    # Writing eula=true means you accept the Minecraft EULA
+    # (https://aka.ms/MinecraftEULA): read it first.  The play writes it
+    # only with minecraft_eula_accepted set true; until eula.txt says true,
+    # the server won't start.
     - name: eula.txt
       ansible.builtin.copy:
         content: "eula=true\n"
         dest: "{{ minecraft_dir }}/eula.txt"
         owner: "{{ minecraft_user }}"
         mode: "0644"
+      when: minecraft_eula_accepted | default(false) | bool
 
     - name: user_jvm_args.txt
       ansible.builtin.copy:

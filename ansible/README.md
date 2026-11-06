@@ -10,7 +10,7 @@ nothing unless the bundle or a variable did.
 |---|---|
 | `inventory.example.ini` | the hosts: copy to `inventory.ini` (ignored by git) with yours; the user needs passwordless sudo |
 | `host_vars/<host>.yml` | (yours, ignored by git) one host's own values over `group_vars`: `ccnix_gateway_mode: nat`, its forwards |
-| `group_vars/minecraft.yml` | versions, heap, ports, `server.properties` keys, the gateway's mode, address, CC networks and routes, the TUN device, forwarding and NAT, NAT mode's policy and forwards |
+| `group_vars/minecraft.yml` | versions, heap, ports, whether you accept the EULA, `server.properties` keys, the gateway's mode, address, CC networks and routes, the TUN device, forwarding and NAT, NAT mode's policy and forwards |
 | `site.yml` | the play |
 | `templates/` | `minecraft.service`, `ccnix-tun.service`, the first `ccnix-server.toml` |
 | `run-on-host.sh` | runs the play on the host itself, for a controller without Ansible |
@@ -23,6 +23,16 @@ Build the mod and the bundle first, on the desktop:
 ./gradlew build
 helper/server-bundle.sh "<your CurseForge instance folder>"   # server-bundle.tar.gz
 ```
+
+The bundle holds other authors' mods and configs under their own
+licences. It is for your own server: don't publish or share it.
+
+The Minecraft EULA: the server starts only once `eula.txt` says
+`eula=true`, and writing that means you accept the
+[Minecraft EULA](https://aka.ms/MinecraftEULA): read it first. The play
+writes it only with `minecraft_eula_accepted` true (in your
+`host_vars/<host>.yml`, or `-e minecraft_eula_accepted=true`); it's
+`false` by default, and then the play leaves `eula.txt` alone.
 
 Then, from Linux, macOS or WSL with Ansible:
 

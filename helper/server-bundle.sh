@@ -14,12 +14,15 @@
 # lists one beside the newer jar, which NeoForge would ignore anyway; ccnix
 # and the pack's Advanced Peripherals need 1.120 and 1.119), and build/libs' ccnix jar.
 # Runs in Git Bash on Windows or on Linux; build the mod first.
+#
+# The bundle holds other authors' mods and configs under their own
+# licences.  It is for your own server: don't publish or share it.
 set -e
 
 # jars (by name prefix) that stop a dedicated server: client-only mods
 CLIENT_ONLY="sodium-"
 
-[ $# -ge 1 ] || { sed -n '2,17s/^# \{0,1\}//p' "$0"; exit 2; }
+[ $# -ge 1 ] || { sed -n '2,20s/^# \{0,1\}//p' "$0"; exit 2; }
 inst=$1
 out=${2:-server-bundle.tar.gz}
 here=$(cd "$(dirname "$0")/.." && pwd)
