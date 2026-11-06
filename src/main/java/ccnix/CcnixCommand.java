@@ -12,8 +12,11 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.logging.LogUtils;
+import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
 import net.neoforged.fml.loading.FMLPaths;
 import org.slf4j.Logger;
 
@@ -46,7 +49,9 @@ import static net.minecraft.commands.Commands.literal;
  *   /ccnix forward del &lt;port&gt;[/udp]
  *   /ccnix gateways                         the gateway blocks: IDs, owners, where
  *   /ccnix gateways forget &lt;id&gt;             one that's gone without being broken: no longer counted
- *   /ccnix rom update                       git pull (or clone) ccnix-rom/ in the server's folder, then reload
+ *   /ccnix rom update                       git pull (or clone) ccnix-rom/ in the server's folder; if that brought
+ *                                           anything new, says loading it pauses the server and how to go ahead
+ *   /ccnix rom update confirm               the same, then reload the data packs (as /reload does) to load it
  * </pre>
  * Route and forward changes are saved in config/ccnix-server.toml and apply at once. The mode is the server admin's,
  * set in the config only.
@@ -80,7 +85,9 @@ final class CcnixCommand {
                         .executes(ctx -> forgetGateway(ctx.getSource(), IntegerArgumentType.getInteger(ctx, "id"))))))
             .then(literal("rom")
                 .executes(ctx -> say(ctx, romStatus()))
-                .then(literal("update").requires(s -> s.hasPermission(OPS)).executes(ctx -> updateRom(ctx.getSource())))));
+                .then(literal("update").requires(s -> s.hasPermission(OPS))
+                    .executes(ctx -> updateRom(ctx.getSource(), false))
+                    .then(literal("confirm").executes(ctx -> updateRom(ctx.getSource(), true))))));
     }
 
     // ---------------------------------------------------------------------------------------------------------------
@@ -137,7 +144,7 @@ final class CcnixCommand {
                 + (rom.date > 0 ? " (" + Instant.ofEpochSecond(rom.date) + ")" : "") + ", " + rom.files.size()
                 + " files, from " + rom.source);
             out.add("  computers update from " + rom.url + " " + rom.branch + "; /ccnix rom update pulls "
-                + Rom.CHECKOUT + "/ in the server's folder (git) and reloads");
+                + Rom.CHECKOUT + "/ in the server's folder (git), and loading what it brings pauses the server");
         }
         return out;
     }
@@ -292,47 +299,76 @@ final class CcnixCommand {
     // The ROM
     // ---------------------------------------------------------------------------------------------------------------
 
-    private static int updateRom(CommandSourceStack src) {
+    /** How long the last ROM reload took, in ms (-1: none yet since the server started). */
+    private static volatile long lastReload = -1;
+
+    /**
+     * Pull (or clone) the checkout off the server thread. Loading what it brings means reloading the data packs, as
+     * /reload does, and the server stops until that's done (a while, on a big pack): only with confirm, and only when
+     * the checkout differs from the ROM the computers have.
+     */
+    private static int updateRom(CommandSourceStack src, boolean load) {
         Rom rom = RomPack.current();
         var server = src.getServer();
         Path dir = FMLPaths.GAMEDIR.get().resolve(Rom.CHECKOUT);
         boolean clone = !Files.isDirectory(dir.resolve(".git"));
         if (clone && Files.exists(dir)) return fail(src, dir + " is there but isn't a git checkout: move it out of the way");
         if (clone && (rom == null || rom.url == null)) return fail(src, "No repo to clone: the mod's ROM didn't load");
-        var was = rom == null ? "none" : rom.version + " at " + shortCommit(rom.commit);
         src.sendSuccess(() -> Component.literal(clone ? "Cloning " + rom.url + " " + rom.branch + " into " + Rom.CHECKOUT + "/..."
             : "Pulling " + Rom.CHECKOUT + "/..."), true);
         CompletableFuture.supplyAsync(() -> {
             var got = clone ? git(dir.getParent(), "clone", "--depth", "1", "--branch", rom.branch, rom.url, Rom.CHECKOUT)
                 : git(dir, "pull", "--ff-only");
             if (!got.ok()) return got;
-            var commit = git(dir, "rev-parse", "HEAD");
-            if (!commit.ok()) return commit;
-            String version;
-            try {
-                var v = Files.readString(dir.resolve("deploy/version")).trim();
-                version = v.isEmpty() ? "unversioned" : v.split("\\s+")[0];
-            } catch (IOException e) {
-                version = "unversioned";
-            }
-            return new Git(true, version + " at " + shortCommit(commit.out()));
+            return git(dir, "rev-parse", "HEAD");
         }).thenAccept(got -> server.execute(() -> {
             if (!got.ok()) {
                 src.sendFailure(Component.literal("ROM update failed: " + got.out()));
                 return;
             }
-            var is = got.out();
+            Rom now = RomPack.current();
+            var was = now == null ? "none" : now.version + " at " + shortCommit(now.commit);
+            var is = checkoutVersion(dir) + " at " + shortCommit(got.out());
+            if (now != null && got.out().equals(now.commit)) {
+                src.sendSuccess(() -> Component.literal("The ROM is up to date (ccnix " + was + ")"), true);
+                return;
+            }
+            if (!load) {
+                var pause = lastReload < 0 ? "a while, on a big pack"
+                    : "it took " + Math.max(1, Math.round(lastReload / 1000.0)) + " s the last time";
+                src.sendSuccess(() -> Component.literal(Rom.CHECKOUT + "/ has ccnix " + is + "; computers have " + was
+                    + ". Loading it reloads the data packs, as /reload does, and the server stops until that's done ("
+                    + pause + "). ").append(Component.literal("[Load it]").withStyle(st -> st.withColor(ChatFormatting.GREEN)
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/ccnix rom update confirm"))
+                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                            Component.literal("/ccnix rom update confirm: pull again and reload")))))
+                    .append(" or /ccnix rom update confirm"), false);
+                return;
+            }
+            src.sendSuccess(() -> Component.literal("Reloading the data packs for ccnix " + is + "..."), true);
+            long start = System.nanoTime();
             server.reloadResources(server.getPackRepository().getSelectedIds()).whenComplete((v, e) -> {
+                lastReload = (System.nanoTime() - start) / 1_000_000;
                 if (e != null) {
                     src.sendFailure(Component.literal("Reloading failed: " + e.getMessage()));
                     return;
                 }
-                LOG.info("ccnix: {} updated the ROM: {} -> {}", src.getTextName(), was, is);
-                src.sendSuccess(() -> Component.literal(was.equals(is) ? "The ROM is up to date (ccnix " + is + ")"
-                    : "The ROM is ccnix " + is + " now (was " + was + "): computers boot it from their next reboot"), true);
+                LOG.info("ccnix: {} updated the ROM: {} -> {} (the reload took {} ms)", src.getTextName(), was, is, lastReload);
+                src.sendSuccess(() -> Component.literal("The ROM is ccnix " + is + " now (was " + was
+                    + "): computers boot it from their next reboot"), true);
             });
         }));
         return 1;
+    }
+
+    /** deploy/version in the checkout: its first word, or "unversioned". */
+    private static String checkoutVersion(Path dir) {
+        try {
+            var v = Files.readString(dir.resolve("deploy/version")).trim();
+            return v.isEmpty() ? "unversioned" : v.split("\\s+")[0];
+        } catch (IOException e) {
+            return "unversioned";
+        }
     }
 
     private static String shortCommit(String commit) {

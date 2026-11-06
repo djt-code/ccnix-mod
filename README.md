@@ -41,9 +41,13 @@ The ROM comes from one of two places:
 - **A checkout.** If the server's folder has `ccnix-rom/`, a git checkout of the ccnix repo, the ROM comes from there
   instead.
 
-`/ccnix rom update` (permission level 3, in game or at the server console) does it all while the server runs: it
-clones the repo the ROM came from into `ccnix-rom/` the first time (its branch, shallow), `git pull --ff-only`s it
-after that, and reloads the data packs, which rebuilds the ROM. It needs `git` on the server. By hand, the same is:
+`/ccnix rom update` (permission level 3, in game or at the server console) does it while the server runs: it
+clones the repo the ROM came from into `ccnix-rom/` the first time (its branch, shallow), and `git pull --ff-only`s it
+after that. It needs `git` on the server. Loading what it brought means reloading the data packs, which rebuilds the
+ROM, and that stops the server until it's done, as `/reload` does (on a big pack, many seconds). So when the
+checkout differs from the ROM the computers have, it says so, with how long the last reload took, and waits for
+`/ccnix rom update confirm` (or a click on `[Load it]`), which pulls again and reloads. When nothing changed, nothing
+is reloaded. By hand, the same is:
 
 ```sh
 cd /path/to/server

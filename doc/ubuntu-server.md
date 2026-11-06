@@ -192,7 +192,9 @@ copy of `config/ccnix-server.toml` first), start.
 
 **A live ROM** (ccnix's Lua without rebuilding the jar): `/ccnix rom
 update` in game (or `mc-cmd "ccnix rom update"`) clones the repo into
-`ccnix-rom/` the first time, pulls it after, and reloads. Delete the
+`ccnix-rom/` the first time and pulls it after; `/ccnix rom update confirm`
+loads what it brought, reloading the data packs, which pauses the server
+as `/reload` does. Delete the
 folder and `/reload` to go back to the jar's.
 
 ## 5. Joining from the desktop
