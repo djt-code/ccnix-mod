@@ -331,6 +331,14 @@ password, and A's shell is on your terminal with ANSI colours; `exit`
 leaves. `sysctl telnetd.attach=console` on A shows A's own screen instead
 (a miner's, say).
 
+**IRC on A** (ccnix 0.35.0). On A, `setup ircd` (or `service add ircd
+ircd`, `service enable ircd`, `service start ircd`), and A serves IRC on
+6667 with NickServ, ChanServ and MC, the game's service. With an Advanced
+Peripherals Chat Box beside A, `#minecraft` is the game's chat. From the
+VM (`sudo apt install irssi`): `irssi -c 10.1.1.6 -n vm`, then `/join
+#minecraft`. From B: `irc 10.1.1.6`. `help ircd` on A has the settings;
+`service status ircd` shows how it's doing.
+
 **A's log on the VM** (ccnix 0.14.0). ccnix's syslogd forwards as RFC
 5424 over UDP 514, which rsyslog takes as it is. On the VM, a file
 `/etc/rsyslog.d/10-ccnix.conf`:

@@ -295,7 +295,8 @@ A router on another block's cable is on the same exchange: give it `10.1.0.3/24`
 routers can reach each other directly (`ip route add 10.1.3.0/24 via 10.1.0.3` on the first) as well as through the
 gateway's routes.
 
-In TUN mode, `telnet 10.1.1.6` from the server reaches a CC computer running `telnetd`. Other machines reach CC's
+In TUN mode, `telnet 10.1.1.6` from the server reaches a CC computer running `telnetd`, and `irssi -c 10.1.1.6`
+one running `ircd` (ccnix's IRC server, whose `#minecraft` is the game's chat). Other machines reach CC's
 networks in one of two ways:
 - through the server, with a route to them on your real router and `FORWARD=1`;
 - or only outbound, with `NAT`.
