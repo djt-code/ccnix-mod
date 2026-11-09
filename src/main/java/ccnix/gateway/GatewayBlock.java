@@ -1,6 +1,8 @@
 package ccnix.gateway;
 
+import ccnix.Ccnix;
 import com.mojang.serialization.MapCodec;
+import net.minecraft.network.chat.Component;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -28,7 +30,7 @@ import net.minecraft.world.phys.BlockHitResult;
 
 /**
  * The gateway: a block with one network port, on the side that faced the player who placed it; a CC cable joins it
- * there and nowhere else. Right-click with an empty hand for its dialog.
+ * there and nowhere else. Right-click it with a Network Tester for its dialog.
  */
 public final class GatewayBlock extends Block implements EntityBlock {
     public static final MapCodec<GatewayBlock> CODEC = simpleCodec(GatewayBlock::new);
@@ -104,19 +106,34 @@ public final class GatewayBlock extends Block implements EntityBlock {
         super.onRemove(state, level, pos, newState, movedByPiston);
     }
 
-    /** With something in hand, it's used as usual (a cable placed against the block); empty-handed, the stats. */
+    /**
+     * A Network Tester opens its dialog; anything else in hand is used as usual (a cable placed against the block);
+     * an empty hand is told it takes a tester (or, with one in the off hand, opens it too).
+     */
     @Override
     protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos, Player player,
                                               InteractionHand hand, BlockHitResult hit) {
+        if (stack.is(Ccnix.NETWORK_TESTER.get())) {
+            open(level, pos, player);
+            return ItemInteractionResult.sidedSuccess(level.isClientSide);
+        }
         return stack.isEmpty() ? ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION
             : ItemInteractionResult.SKIP_DEFAULT_BLOCK_INTERACTION;
     }
 
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
+        if (player.getOffhandItem().is(Ccnix.NETWORK_TESTER.get())) {
+            open(level, pos, player);
+        } else if (player instanceof ServerPlayer p) {
+            p.displayClientMessage(Component.literal("Use a Network Tester on it for its status and VLANs"), true);
+        }
+        return InteractionResult.sidedSuccess(level.isClientSide);
+    }
+
+    private static void open(Level level, BlockPos pos, Player player) {
         if (player instanceof ServerPlayer p && level.getBlockEntity(pos) instanceof GatewayBlockEntity gateway) {
             gateway.openFor(p, "");
         }
-        return InteractionResult.sidedSuccess(level.isClientSide);
     }
 }

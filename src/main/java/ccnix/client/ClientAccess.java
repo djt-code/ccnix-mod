@@ -8,7 +8,13 @@ public final class ClientAccess {
     private ClientAccess() {
     }
 
-    public static void openGateway(GatewayScreenData data) {
-        Minecraft.getInstance().setScreen(new GatewayScreen(data));
+    /** A gateway block's dialog: updated if it's the one open, else opened (a refresh only updates). */
+    public static void gateway(GatewayScreenData data) {
+        var mc = Minecraft.getInstance();
+        if (mc.screen instanceof GatewayScreen open && open.pos().equals(data.pos())) {
+            open.update(data);
+        } else if (!data.refresh()) {
+            mc.setScreen(new GatewayScreen(data));
+        }
     }
 }

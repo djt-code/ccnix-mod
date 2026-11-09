@@ -306,6 +306,14 @@ class GatewayTest {
         assertEquals("the only block on its network", lines.get(3));
         assertEquals("frames: 0 in, 2 out (2 from other blocks)", g.portStatus(other).get(0));
         assertEquals(List.of("this block isn't on the gateway yet"), g.portStatus(new Port()));
+
+        var v = g.portView(lan);                        // (the dialog's: the same, as fields)
+        assertEquals(List.of(2L, 0L, 0L, 0L), List.of(v.in(), v.out(), v.relayed(), v.filtered()));
+        assertEquals(List.of("02:cc:00:00:03:05", "02:cc:00:00:03:05 (VLAN 20)"), v.macs());
+        assertEquals("1, 20", v.vlansSeen());
+        assertFalse(v.standby());
+        assertEquals(0, v.sharing());
+        assertNull(g.portView(new Port()), "not on the gateway");
     }
 
     static Map<String, Object> ping(String from, String to) {

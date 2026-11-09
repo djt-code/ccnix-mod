@@ -288,28 +288,30 @@ public final class Service {
         return out;
     }
 
-    /** One block's part, for its right-click: the gateway, then the block. */
-    static List<String> portStatus(Gateway.Port p) {
+    /**
+     * What a block's dialog shows of the gateway: its address, mode and channel, the VLANs the server carries, and the
+     * block's own view (null: it isn't on the gateway yet, or the gateway didn't answer).
+     */
+    record View(String address, String mode, int channel, String serverVlans, Gateway.PortView port) {
+    }
+
+    /** One block's view, for its dialog; null if the gateway isn't running. */
+    static View view(Gateway.Port p) {
         ScheduledExecutorService e;
         Gateway g;
         synchronized (Service.class) {
             e = exec;
             g = gateway;
         }
-        if (e == null || g == null) return List.of("the gateway isn't running");
-        var s = settings();
-        var out = new ArrayList<String>();
-        out.add("on the exchange: the gateway is " + s.address() + " (" + mode + " mode), channel " + s.channel());
-        out.add("VLANs the server carries: " + Gateway.says(vlans()) + " (VLAN 1 is always the exchange)");
-        int nat = p.nativeVlan();
-        out.add("untagged on this block's cable: " + (nat == 0 ? "nothing (native none: every VLAN tagged)"
-            : nat == 1 ? "VLAN 1, the exchange" : "VLAN " + nat + " (the exchange is tagged, as back.1)"));
+        if (e == null || g == null) return null;
+        Gateway.PortView port;
         try {
-            out.addAll(e.submit(() -> g.portStatus(p)).get(2, TimeUnit.SECONDS));
+            port = e.submit(() -> g.portView(p)).get(2, TimeUnit.SECONDS);
         } catch (Exception ex) {
-            out.add("the gateway didn't answer: " + ex);
+            port = null;
         }
-        return out;
+        var s = settings();
+        return new View(s.address(), mode, s.channel(), Gateway.says(vlans()), port);
     }
 
     private static void run(Consumer<Gateway> task) {

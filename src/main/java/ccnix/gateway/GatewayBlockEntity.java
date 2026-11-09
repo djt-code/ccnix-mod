@@ -179,11 +179,66 @@ public final class GatewayBlockEntity extends BlockEntity implements Gateway.Por
         return null;
     }
 
-    /** Its dialog, on player's screen, with what the last change said. */
+    /** The block at pos if player is near enough to use it (8 blocks, as a container), else null. */
+    static GatewayBlockEntity near(ServerPlayer player, BlockPos pos) {
+        if (player.distanceToSqr(Vec3.atCenterOf(pos)) > 64 || !player.level().isLoaded(pos)) return null;
+        return player.level().getBlockEntity(pos) instanceof GatewayBlockEntity gateway ? gateway : null;
+    }
+
+    /** Its dialog, on player's screen (opened if it isn't), with what the last change said. */
     void openFor(ServerPlayer player, String message) {
-        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
-            new GatewayScreenData(worldPosition, stats(), vlanSpec, nativeVlan == 0 ? "none" : String.valueOf(nativeVlan),
-                mayChange(player), message));
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player, screen(player, false, message));
+    }
+
+    /** Its stats again, for the dialog player has open (if it's still open). */
+    void refreshFor(ServerPlayer player) {
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player, screen(player, true, ""));
+    }
+
+    /** What its dialog shows player. */
+    private GatewayScreenData screen(ServerPlayer player, boolean refresh, String message) {
+        var rows = new ArrayList<GatewayScreenData.Row>();
+        List<Long> counts = List.of();
+        int state;
+        String stateText;
+        var v = Service.view(this);
+        if (v == null) {
+            state = GatewayScreenData.DOWN;
+            stateText = "The gateway isn't running (/ccnix says why)";
+        } else {
+            rows.add(new GatewayScreenData.Row("Gateway", v.address() + ", " + v.mode() + " mode",
+                "The server's address on the exchange (VLAN 1), on modem channel " + v.channel()));
+            rows.add(new GatewayScreenData.Row("Untagged", nativeVlan == 0 ? "nothing: every VLAN tagged"
+                : nativeVlan == 1 ? "VLAN 1, the exchange" : "VLAN " + nativeVlan + " (the exchange as back.1)",
+                "What this block's cable carries untagged (its native VLAN). Every other VLAN goes tagged, on channel "
+                    + v.channel() + " + the VLAN (lib/net's back.20)"));
+            var port = v.port();
+            if (port == null) {
+                state = GatewayScreenData.DOWN;
+                stateText = "Not on the gateway yet";
+            } else if (port.standby()) {
+                state = GatewayScreenData.STANDBY;
+                stateText = "Standing by";
+                rows.add(new GatewayScreenData.Row("Standing by", "another block works this network",
+                    "Only one gateway block works each cable network. This one takes over if that one goes (its chunk"
+                        + " unloads, or it's broken)"));
+            } else {
+                state = GatewayScreenData.WORKING;
+                stateText = "Working";
+                counts = List.of(port.in(), port.out(), port.relayed(), port.filtered());
+                rows.add(new GatewayScreenData.Row("MACs heard", String.valueOf(port.macs().size()),
+                    port.macs().isEmpty() ? "None heard on this block's cable lately" : String.join("\n", port.macs())));
+                rows.add(new GatewayScreenData.Row("VLANs seen", port.vlansSeen(), "The VLANs frames came in on here"));
+                rows.add(new GatewayScreenData.Row("Its network", port.sharing() == 0 ? "the only block on it"
+                    : port.sharing() + (port.sharing() == 1 ? " other block stands by" : " other blocks stand by"),
+                    "Only one gateway block works each cable network: others on it stand by"));
+            }
+            rows.add(new GatewayScreenData.Row("Server carries", v.serverVlans(),
+                "The VLANs the server lets any block carry (its config's gateway.vlans)"));
+        }
+        return new GatewayScreenData(worldPosition, refresh, name(),
+            (owner == null ? "At " : "Placed by " + ownerName + ", at ") + where(), state, stateText, rows, counts,
+            vlanSpec, nativeVlan == 0 ? "none" : String.valueOf(nativeVlan), mayChange(player), message);
     }
 
     private void scheduleConnect() {
@@ -258,14 +313,6 @@ public final class GatewayBlockEntity extends BlockEntity implements Gateway.Por
                     + " over if #" + other + " goes (its chunk unloads, or it's broken)."), false);
             }
         });
-    }
-
-    /** What a right-click shows. */
-    List<String> stats() {
-        var out = new ArrayList<String>();
-        out.add(name() + (owner == null ? "" : ", placed by " + ownerName) + ", at " + where());
-        out.addAll(Service.portStatus(this));
-        return out;
     }
 
     private String name() {

@@ -5,6 +5,8 @@ import ccnix.gateway.GatewayBlockEntity;
 import ccnix.gateway.GatewayFilter;
 import ccnix.gateway.GatewayScreenData;
 import ccnix.gateway.GatewayItem;
+import ccnix.gateway.GatewayPoll;
+import ccnix.gateway.NetworkTesterItem;
 import ccnix.gateway.Service;
 import ccnix.rom.RomPack;
 import dan200.computercraft.api.network.wired.WiredElementCapability;
@@ -50,6 +52,9 @@ public final class Ccnix {
         BlockBehaviour.Properties.of().mapColor(MapColor.STONE).strength(1.5f).sound(SoundType.STONE)));
     public static final DeferredItem<BlockItem> GATEWAY_ITEM = ITEMS.register("gateway",
         () -> new GatewayItem(GATEWAY.get(), new Item.Properties()));
+    /** Used on a gateway block, it opens its dialog. */
+    public static final DeferredItem<NetworkTesterItem> NETWORK_TESTER = ITEMS.register("network_tester",
+        () -> new NetworkTesterItem(new Item.Properties().stacksTo(1)));
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<GatewayBlockEntity>> GATEWAY_ENTITY =
         BLOCK_ENTITIES.register("gateway", () -> BlockEntityType.Builder.of(GatewayBlockEntity::new, GATEWAY.get()).build(null));
 
@@ -63,11 +68,14 @@ public final class Ccnix {
             e.registerBlockEntity(WiredElementCapability.get(), GATEWAY_ENTITY.get(), (be, side) -> be.element(side)));
         bus.addListener((BuildCreativeModeTabContentsEvent e) -> {
             if (e.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) e.accept(GATEWAY_ITEM);
+            if (e.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) e.accept(NETWORK_TESTER);
         });
         bus.addListener(RomPack::addTo);
-        bus.addListener((RegisterPayloadHandlersEvent e) -> e.registrar("2")
+        // (the version: a client and server whose payloads differ are refused, not left to misread them)
+        bus.addListener((RegisterPayloadHandlersEvent e) -> e.registrar("3")
             .playToClient(GatewayScreenData.TYPE, GatewayScreenData.STREAM_CODEC, GatewayScreenData::handle)
-            .playToServer(GatewayFilter.TYPE, GatewayFilter.STREAM_CODEC, GatewayFilter::handle));
+            .playToServer(GatewayFilter.TYPE, GatewayFilter.STREAM_CODEC, GatewayFilter::handle)
+            .playToServer(GatewayPoll.TYPE, GatewayPoll.STREAM_CODEC, GatewayPoll::handle));
         bus.addListener((ModConfigEvent.Reloading e) -> {
             if (e.getConfig().getSpec() == Config.SPEC) Service.reconfigure();
         });

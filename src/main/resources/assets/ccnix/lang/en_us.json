@@ -1,3 +1,5 @@
 {
-  "block.ccnix.gateway": "Network Gateway"
+  "block.ccnix.gateway": "Network Gateway",
+  "item.ccnix.network_tester": "Network Tester",
+  "item.ccnix.network_tester.tip": "Use on a Network Gateway for its status and VLANs"
 }

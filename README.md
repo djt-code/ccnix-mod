@@ -98,12 +98,22 @@ was last heard on, a broadcast to all of them; `gateway.vlans` (all by default) 
 
 - **One block per cable network.** Blocks on the same cable network hear each other's beacons (on a channel no modem
   opens); the first placed works and the others stand by, carrying nothing, until it goes (broken, or its chunk
-  unloaded): a spare, not a loop. Its owner is told once, and its right-click says so.
+  unloaded): a spare, not a loop. Its owner is told once, and its dialog says so.
 - **IDs and owners.** Each block gets an ID when placed, and remembers who placed it. A player may have
   `gateway.maxPerPlayer` (5) placed; `/ccnix gateways` lists them all.
-- **Right-click** one with an empty hand for its dialog: its ID and owner, frames in and out (and filtered), the MACs
-  heard behind it, the VLANs seen, whether it stands by, what goes untagged on its cable, and its VLANs (VLAN 1 is
-  always the exchange).
+- **A Network Tester** opens a block's dialog: right-click the block holding one (in the main hand, or the off hand
+  with the main hand empty). Craft it from four iron ingots, a glass pane, redstone and a CC cable:
+
+  ```
+  I G I     I iron ingot, G glass pane
+  I R I     R redstone
+    C       C computercraft:cable
+  ```
+
+  The dialog is a container-style panel, live while it's open (it asks each second; the frame counts show their
+  rate): its ID, owner and place, whether it works, stands by or isn't on the gateway, frames in, out, from other
+  blocks and filtered, the MACs heard behind it, the VLANs seen, what goes untagged on its cable, and its VLANs (VLAN
+  1 is always the exchange). The pointer over a row says more (all the MACs, for one). It closes when you walk away.
 - **Each block's VLANs** (in its dialog; its owner's to change, or an op's), as a trunk port's: the VLANs it carries
   (`"1-4094"`, the default; `"2-4094"` a trunk with no way onto the exchange or to the gateway; `"1,10,20-29"`) and
   its native VLAN (a number in that list, or `none` to drop untagged frames). With a native VLAN other than 1, the

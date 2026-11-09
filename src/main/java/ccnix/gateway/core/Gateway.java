@@ -489,10 +489,19 @@ public final class Gateway {
         return out;
     }
 
-    /** One block's part, for its right-click. */
-    public List<String> portStatus(Port p) {
+    /**
+     * One block's counts and what it has heard, for its dialog: frames in and out (relayed: from other blocks;
+     * filtered: dropped by its VLANs), the MACs heard there (" (VLAN n)" after one off the exchange), the VLANs seen
+     * there, and how many other blocks share its cable network.
+     */
+    public record PortView(boolean standby, long in, long out, long relayed, long filtered, List<String> macs,
+                           String vlansSeen, int sharing) {
+    }
+
+    /** One block's view, or null if it isn't on the gateway (yet). */
+    public PortView portView(Port p) {
         var stats = ports.get(p);
-        if (stats == null) return List.of("this block isn't on the gateway yet");
+        if (stats == null) return null;
         long now = clock.getAsLong();
         var behind = new TreeSet<String>();
         macs.forEach((key, l) -> {
@@ -503,20 +512,29 @@ public final class Gateway {
         });
         int sharing = 0;
         for (var q : ports.keySet()) if (q != p && together(p, q)) sharing++;
+        return new PortView(standby.containsKey(p), stats.in, stats.out, stats.relayed, stats.filtered,
+            List.copyOf(behind), says(stats.vlans), sharing);
+    }
+
+    /** One block's part, as text. */
+    public List<String> portStatus(Port p) {
+        var v = portView(p);
+        if (v == null) return List.of("this block isn't on the gateway yet");
         var out = new ArrayList<String>();
-        if (standby.containsKey(p)) {
+        if (v.standby()) {
             out.add("standing by: another gateway block is on this cable network, and only one works on each (this one"
                 + " takes over if that one goes)");
             return out;
         }
-        out.add("frames: " + stats.in + " in, " + stats.out + " out (" + stats.relayed + " from other blocks)"
-            + (stats.filtered > 0 ? ", " + stats.filtered + " filtered" : ""));
+        out.add("frames: " + v.in() + " in, " + v.out() + " out (" + v.relayed() + " from other blocks)"
+            + (v.filtered() > 0 ? ", " + v.filtered() + " filtered" : ""));
+        var behind = v.macs();
         out.add(behind.size() + (behind.size() == 1 ? " MAC" : " MACs") + " heard here"
             + (behind.isEmpty() ? "" : ": " + String.join(", ", behind.stream().limit(8).toList())
             + (behind.size() > 8 ? ", ..." : "")));
-        out.add("VLANs seen here: " + says(stats.vlans));
-        out.add(sharing == 0 ? "the only block on its network" : sharing
-            + (sharing == 1 ? " other block stands by" : " other blocks stand by") + " on its network");
+        out.add("VLANs seen here: " + v.vlansSeen());
+        out.add(v.sharing() == 0 ? "the only block on its network" : v.sharing()
+            + (v.sharing() == 1 ? " other block stands by" : " other blocks stand by") + " on its network");
         return out;
     }
 }
