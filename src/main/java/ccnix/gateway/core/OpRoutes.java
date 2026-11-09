@@ -37,7 +37,7 @@ public final class OpRoutes {
 
     /**
      * line ("a.b.c.d/len via a.b.c.d") as a route an op may add to settings: no larger than /largest, behind a router
-     * on the gateway's network, not the gateway's own network, inside one of the CC networks, in TUN mode (tun not
+     * on the gateway's network, not inside the gateway's own network, inside one of the CC networks, in TUN mode (tun not
      * null) inside a network the server routes into the TUN device, and not routed already.
      */
     public static Check add(String line, Settings s, int largest, List<NatConfig.Net> networks, List<HostRoute> tun) {
@@ -55,8 +55,9 @@ public final class OpRoutes {
         if (!s.onNetwork(gw) || gw == s.ip() || gw == s.network() || gw == s.broadcast()) {
             return no(Ipv4.ipString(gw) + " isn't a router's address on the gateway's network, " + s.address());
         }
-        if (overlaps(ip, len, s.network(), s.prefix())) {
-            return no(words[0] + " overlaps the gateway's own network, " + Ipv4.ipString(s.network()) + "/" + s.prefix());
+        // (around it is fine: the gateway's own network is the longer match, as a connected route is)
+        if (len >= s.prefix() && overlaps(ip, len, s.network(), s.prefix())) {
+            return no(words[0] + " is inside the gateway's own network, " + Ipv4.ipString(s.network()) + "/" + s.prefix());
         }
         for (var r : s.routes()) {
             if (r.net() == ip && r.prefix() == len) return no(words[0] + " is routed already (" + r + "): del it first");

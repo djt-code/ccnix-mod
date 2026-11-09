@@ -8,7 +8,7 @@
 #   USER      the user the Minecraft server runs as: the device is theirs,
 #             so ccnix-tun needs no privileges
 #   ADDRESS   the server's address on the device: the gateway's address in
-#             the mod's config (10.0.0.1/24 unless you changed it), so
+#             the mod's config (10.1.0.1/24 unless you changed it), so
 #             packets CC sends to the gateway reach the server
 #   NETWORK   CC's networks behind CC routers (the mod's gateway.networks):
 #             the server sends their packets into the device. The gateway's
@@ -37,8 +37,8 @@
 #                   away.  The mod drops those too (gateway.sourceCheck):
 #                   this is the host's own line, should that be off
 #
-#   ccnix-tun-setup minecraft 10.0.0.1/24 10.1.0.0/16
-#   NAT=eth0 ccnix-tun-setup minecraft 10.0.0.1/24 10.1.0.0/16 10.2.0.0/16
+#   ccnix-tun-setup minecraft 10.1.0.1/24 10.1.0.0/16
+#   NAT=eth0 ccnix-tun-setup minecraft 10.1.0.1/24 10.1.0.0/16 10.2.0.0/16
 #
 # Running it again leaves things as it says, whatever was there before.
 set -e
@@ -74,7 +74,7 @@ if [ "$1" = "--remove" ]; then
     exit 0
 fi
 user=$1
-addr=${2:-10.0.0.1/24}
+addr=${2:-10.1.0.1/24}
 [ $# -gt 1 ] && shift 2 || shift
 dev=${DEVICE:-ccnix0}
 table=${TABLE:-25565}
@@ -88,7 +88,8 @@ fi
 legacy
 
 ip link show "$dev" >/dev/null 2>&1 || ip tuntap add dev "$dev" mode tun user "$user"
-ip addr replace "$addr" dev "$dev"
+ip addr flush dev "$dev"                        # (an address it had before, changed since, goes)
+ip addr add "$addr" dev "$dev"
 ip link set "$dev" up
 
 # the networks, in their table and nowhere else (older versions put them in main)

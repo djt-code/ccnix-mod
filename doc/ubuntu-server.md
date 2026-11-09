@@ -91,13 +91,15 @@ cc -O2 -Wall -o /usr/local/bin/ccnix-tun /root/ccnix-tun.c
 install -m 755 /root/ccnix-tun-setup /usr/local/sbin/
 ```
 
-**The device.** The gateway is `10.0.0.1/24`; CC networks behind CC
-routers live in `10.1.0.0/16`. `NAT=<uplink>` lets CC computers reach past
+**The device.** The gateway is `10.1.0.1/24` (the exchange, `10.1.0.0/24`,
+where CC routers on its cable take addresses); CC networks behind CC
+routers live in the rest of `10.1.0.0/16`, so one route to `10.1.0.0/16`
+reaches them all. `NAT=<uplink>` lets CC computers reach past
 the VM; leave it off for a first run.
 
 ```sh
-NAT=eth0 ccnix-tun-setup minecraft 10.0.0.1/24 10.1.0.0/16
-ip -br addr show ccnix0                  # UNKNOWN 10.0.0.1/24
+NAT=eth0 ccnix-tun-setup minecraft 10.1.0.1/24 10.1.0.0/16
+ip -br addr show ccnix0                  # UNKNOWN 10.1.0.1/24
 ip route show table 25565                # 10.1.0.0/16 dev ccnix0
 ip rule | grep 2556                      # 25565: main without its default route; 25566: table 25565
 iptables -S ccnix0-src                   # CC's own sources RETURN, the rest DROP (BCP 38)
@@ -126,7 +128,7 @@ Before=minecraft.service
 Type=oneshot
 RemainAfterExit=yes
 Environment=NAT=eth0
-ExecStart=/usr/local/sbin/ccnix-tun-setup minecraft 10.0.0.1/24 10.1.0.0/16
+ExecStart=/usr/local/sbin/ccnix-tun-setup minecraft 10.1.0.1/24 10.1.0.0/16
 
 [Install]
 WantedBy=multi-user.target
@@ -219,10 +221,10 @@ the server runs.
 [gateway]
     mode = "tun"                               # the VM's TUN device (section 3)
     networks = ["10.1.0.0/16"]                 # the CC networks: routes must be inside
-    address = "10.0.0.1/24"
+    address = "10.1.0.1/24"
     channel = 60000
     mac = "02:cc:ff:00:00:00"
-    routes = ["10.1.0.0/16 via 10.0.0.2"]      # the CC router below
+    routes = ["10.1.0.0/16 via 10.1.0.2"]      # the CC router below
     opRoutes = true                            # ops may /ccnix route add|del
     opMaxSubnet = 16                           # a /16 at most
 [nat]                                          # NAT mode only: the mod writes the defaults
@@ -253,16 +255,16 @@ On R (everything is in the ROM already; `help ip` and `help network` are
 there too):
 
 ```
-ip addr add back 10.0.0.2/24
-ip route add default via 10.0.0.1
+ip addr add back 10.1.0.2/24
+ip route add default via 10.1.0.1
 router boot                  routing from every boot; this shows the screen (q leaves it)
-ping -c 4 10.0.0.1           the VM answers: it's the gateway's address on ccnix0
+ping -c 4 10.1.0.1           the VM answers: it's the gateway's address on ccnix0
 ```
 
 (ccnix's `ping` keeps going until Ctrl+T, as Linux's does, and then prints
 the summary; `-c 4` stops after four.)
 
-On the VM: `ping 10.0.0.2` answers from R. `/ccnix` in game shows the
+On the VM: `ping 10.1.0.2` answers from R. `/ccnix` in game shows the
 gateway's blocks, R as a neighbour, and packets carried. If `ping` says
 "host unreachable": R's `ip neigh` has no `gateway`; check the cable touches
 both the modem and the gateway block, and the channel is 60000 on both (ccnix 0.7.0 and ccnix-mod 0.13.0 or later; 4040 before).
@@ -270,49 +272,49 @@ both the modem and the gateway block, and the channel is 60000 on both (ccnix 0.
 ## 8. In game: a VLAN behind R
 
 A second cable, from a wired modem on R's LEFT, to two more computers A and
-B with wired modems. That cable carries VLAN 20, network `10.1.0.0/24`,
+B with wired modems. That cable carries VLAN 20, network `10.1.1.0/24`,
 with R as its router. (The tag is what lets one cable carry several
 networks: VLAN 30 on the same wire would be another, `left.30`, that A and
 B can't hear. `help network` has the trunk variant with everything on one
 cable, the gateway's included.)
 
 ```
- R: ip addr add left.20 10.1.0.1/24           (router: `router` restarts its screen; forwarding is on)
- A: ip addr add back.20 10.1.0.6/24
-    ip route add default via 10.1.0.1
+ R: ip addr add left.20 10.1.1.1/24           (router: `router` restarts its screen; forwarding is on)
+ A: ip addr add back.20 10.1.1.6/24
+    ip route add default via 10.1.1.1
     ip boot                                   (up at every boot)
     ip up
- B: the same with 10.1.0.7
+ B: the same with 10.1.1.7
 ```
 
 Test the inside first, from A (each `ping` with `-c 4`, or Ctrl+T to stop
-it): `ping 10.1.0.1` (R), `ping 10.0.0.2` (R's other side), `ping
-10.0.0.1` (the VM, through R and the gateway: ttl=62), `traceroute
-10.0.0.1` (10.1.0.1, then 10.0.0.1). With NAT on: `ping 1.1.1.1`.
+it): `ping 10.1.1.1` (R), `ping 10.1.0.2` (R's other side), `ping
+10.1.0.1` (the VM, through R and the gateway: ttl=62), `traceroute
+10.1.0.1` (10.1.1.1, then 10.1.0.1). With NAT on: `ping 1.1.1.1`.
 
 Then from the VM:
 
 ```sh
-ping 10.1.0.6                 # answers; ttl=63 (R took one)
-traceroute -n 10.1.0.6        # 10.0.0.2, then 10.1.0.6   (apt install traceroute)
+ping 10.1.1.6                 # answers; ttl=63 (R took one)
+traceroute -n 10.1.1.6        # 10.1.0.2, then 10.1.1.6   (apt install traceroute)
 ```
 
 `traceroute` from a real stack works because R answers time-exceeded, and
-the gateway converts it. If `ping 10.1.0.6` says nothing: the gateway has
+the gateway converts it. If `ping 10.1.1.6` says nothing: the gateway has
 no route for 10.1.0.0/16 (section 6), or the VM has none for it on `ccnix0`
 (section 3); `/ccnix` counts the drop.
 
-**TCP both ways.** On A: `nc -l 7`; on the VM: `nc 10.1.0.6 7`, type: the
+**TCP both ways.** On A: `nc -l 7`; on the VM: `nc 10.1.1.6 7`, type: the
 lines show on A and A's on the VM. The other way: on the VM `nc -l 7000`,
-on A `nc 10.0.0.1 7000`. And `nc 10.0.0.1 22` on A prints the VM's SSH
+on A `nc 10.1.0.1 7000`. And `nc 10.1.0.1 22` on A prints the VM's SSH
 banner.
 
 **HTTP from A.** On the VM: `python3 -m http.server 8000`; on A:
-`curl -i http://10.0.0.1:8000/` (ccnix 0.10.0) prints the status line, the
+`curl -i http://10.1.0.1:8000/` (ccnix 0.10.0) prints the status line, the
 headers and the directory listing. ccnix's curl is a small HTTP-only one;
 curl itself is Daniel Stenberg's (https://curl.se). The other way: on A,
 `mkdir /www`, an `index.html` there, and `httpd` (ccnix 0.11.0); on the VM
-`curl -i http://10.1.0.6/`, or a browser on a machine with a route in.
+`curl -i http://10.1.1.6/`, or a browser on a machine with a route in.
 
 **Telnet into A.** On A:
 
@@ -324,7 +326,7 @@ reboot
 ```
 
 (`wget run https://raw.githubusercontent.com/djt-code/ccnix/main/deploy/setup.lua telnetd`
-does the same, HTTP being on.) From the VM: `telnet 10.1.0.6`, the
+does the same, HTTP being on.) From the VM: `telnet 10.1.1.6`, the
 password, and A's shell is on your terminal with ANSI colours; `exit`
 leaves. `sysctl telnetd.attach=console` on A shows A's own screen instead
 (a miner's, say).
@@ -335,7 +337,7 @@ leaves. `sysctl telnetd.attach=console` on A shows A's own screen instead
 
 ```
 module(load="imudp")
-input(type="imudp" port="514" address="10.0.0.1")
+input(type="imudp" port="514" address="10.1.0.1")
 if $fromhost-ip startswith "10." then {
     action(type="omfile" file="/var/log/ccnix.log")
     stop
@@ -348,7 +350,7 @@ a firewall is on). On A, `setup init` has syslogd running; an
 syslog` and add a line:
 
 ```
-*.info                                          @10.0.0.1
+*.info                                          @10.1.0.1
 ```
 
 then `service restart syslogd` and `logger hello from A`: on the VM,
@@ -357,8 +359,9 @@ services print, telnetd's logins and httpd's requests.
 
 **From your desktop**, not just the VM: `FORWARD=1` (or `NAT`) in the setup
 script, and on the desktop a route to CC's networks through the VM, e.g.
-Windows `route add 10.0.0.0 mask 255.0.0.0 <vm address>`; then `telnet
-10.1.0.6` from there.
+Windows `route add 10.1.0.0 mask 255.255.0.0 <vm address>`, or one
+route for `10.1.0.0/16` via the VM on your LAN's router; then `telnet
+10.1.1.6` from there.
 
 The route on the desktop itself, not only on the LAN's router. With the
 desktop and the VM on one LAN and the route only on the router, the

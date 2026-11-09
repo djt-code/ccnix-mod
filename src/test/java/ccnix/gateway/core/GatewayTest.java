@@ -467,7 +467,8 @@ class GatewayTest {
         var bad = Settings.parse("10.0.0.1", CH, "*", List.of(), problems);
         assertEquals(2, problems.size());
         assertEquals(Settings.DEFAULT_MAC, bad.mac());
-        assertEquals("10.0.0.1/24", bad.address());
+        assertEquals(Settings.DEFAULT_ADDRESS, bad.address());
+        assertEquals("10.1.0.1/24", bad.address(), "the exchange inside the CC networks");
 
         problems.clear();
         assertEquals(GW, Settings.parse("10.0.0.1/24", CH, "gateway", List.of(), problems).mac());

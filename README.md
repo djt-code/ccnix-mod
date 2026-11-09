@@ -89,7 +89,7 @@ answer is the one exception). Programs on the computers do everything above that
 
 Every gateway block, wherever it is, joins one exchange: a switch whose trunk ports are the blocks, as Cisco's,
 Juniper's and Extreme's switches have them. Inside it every frame is on a VLAN, 1-4094, and **VLAN 1 is the exchange
-itself**: 10.0.0.0/24, where routers on different blocks reach each other at their addresses and the gateway is one
+itself**: 10.1.0.0/24, where routers on different blocks reach each other at their addresses and the gateway is one
 host. On a block's cable its **native VLAN** (1 unless its owner sets it, or none) is untagged, on the gateway's
 channel, and every other VLAN is tagged, on the channel + its number (lib/net's `back.20`); a tagged frame for the
 native VLAN is dropped. So a router's `back.20` on one block reaches `back.20` on another, and plain computers (`back`)
@@ -120,7 +120,7 @@ own (Java sockets), carried byte for byte, and the gateway answers ping at its a
   `maxTotal` (256) cap open connections and flows; `tcpIdle` (600 s) and `udpIdle` (60 s) close quiet ones. A
   refused TCP connection gets a reset, a refused datagram "administratively prohibited".
 - **DNS:** `dnsRelay = "system"` relays port 53 at the gateway's address, unread, to the first `nameserver` in
-  `/etc/resolv.conf`, so `ip dns 10.0.0.1` works on a host that blocks outbound DNS. On Windows, which has no such
+  `/etc/resolv.conf`, so `ip dns 10.1.0.1` works on a host that blocks outbound DNS. On Windows, which has no such
   file, the gateway answers A and PTR questions from the Windows resolver instead. An address relays there; `""`
   turns it off. DNS sent to any other address is never touched.
 - **Port forwards:** `forwards = ["25570/tcp -> 10.1.1.10:23"]` listens on the server's port and connects to the CC
@@ -139,9 +139,9 @@ own (Java sockets), carried byte for byte, and the gateway answers ping at its a
 ### TUN mode
 
 ```
- CC host 10.0.0.5 ─┐
-                   ├─ cable ─ [Network Gateway] ··· ccnix-tun ─ ccnix0 (10.0.0.1) ─ the server's kernel ─ eth0
- CC router 10.0.0.2┘   10.0.0.1, 02:cc:ff:00:00:00, (helper,
+ CC host 10.1.0.5 ─┐
+                   ├─ cable ─ [Network Gateway] ··· ccnix-tun ─ ccnix0 (10.1.0.1) ─ the server's kernel ─ eth0
+ CC router 10.1.0.2┘   10.1.0.1, 02:cc:ff:00:00:00, (helper,
    └ 10.1.0.0/16 behind it   channel 60000        no privileges)
 ```
 
@@ -149,11 +149,11 @@ own (Java sockets), carried byte for byte, and the gateway answers ping at its a
 
 The **gateway** is the server's link onto the CC network, and the **server** is the router:
 
-- The gateway answers ARP for its address (`10.0.0.1/24` by default). A packet a CC computer sends it goes into the
+- The gateway answers ARP for its address (`10.1.0.1/24` by default). A packet a CC computer sends it goes into the
   TUN device. The server then takes it (its own address on the device is the gateway's), or forwards it.
 - A packet the server sends into the TUN device goes onward by its destination:
   - **On the gateway's network:** straight to that computer.
-  - **Covered by one of the gateway's routes** (for example `10.1.0.0/16 via 10.0.0.2`): to that CC router.
+  - **Covered by one of the gateway's routes** (for example `10.1.0.0/16 via 10.1.0.2`): to that CC router.
   - **Neither:** dropped.
 
   The gateway asks ARP for the MAC first. Packets wait meanwhile (3 tries, a second apart), and are dropped if no
@@ -185,7 +185,7 @@ it, end to end.
    routers will have behind them:
 
    ```sh
-   sudo helper/ccnix-tun-setup minecraft 10.0.0.1/24 10.1.0.0/16
+   sudo helper/ccnix-tun-setup minecraft 10.1.0.1/24 10.1.0.0/16
    ```
 
    - The networks go in a routing table of their own (25565, the Minecraft port, or `TABLE=`), which the host's own routes come before
@@ -212,7 +212,7 @@ it, end to end.
    Type=oneshot
    RemainAfterExit=yes
    Environment=NAT=eth0
-   ExecStart=/usr/local/sbin/ccnix-tun-setup minecraft 10.0.0.1/24 10.1.0.0/16
+   ExecStart=/usr/local/sbin/ccnix-tun-setup minecraft 10.1.0.1/24 10.1.0.0/16
 
    [Install]
    WantedBy=multi-user.target
@@ -229,10 +229,10 @@ it, end to end.
    | `gateway.mode` | `nat` | `nat` or `tun` (above). |
    | `gateway.networks` | `["10.1.0.0/16"]` | The CC networks behind routers that the gateway carries; every route must be inside one. In TUN mode, give `ccnix-tun-setup` the same. |
    | `gateway.sourceCheck` | `true` | BCP 38, both modes: a packet from CC goes on only if its source is on the gateway's network or in `gateway.networks` (and isn't the gateway's own address, its broadcast, `0.x`, `127.x` or `224.x` and up). The rest are dropped before the server sees them, or in NAT mode before anything is translated, and counted in `/ccnix`. Off, CC computers can forge any source, and in TUN mode only the host's firewall stops them. |
-   | `gateway.address` | `10.0.0.1/24` | The gateway's address and its network. In TUN mode, use the device's address. |
+   | `gateway.address` | `10.1.0.1/24` | The gateway's address and its network, the exchange. Inside `gateway.networks`, so one route on your LAN (`10.1.0.0/16` via the server) reaches the exchange and everything behind it. In TUN mode, use the device's address. |
    | `gateway.channel` | `60000` | The modem channel: 60000 is ccnix's untagged network, 60000 + n is VLAN n (up to 64094). It has to match ccnix's `net.CHANNEL`; before ccnix 0.7.0 that was 4040. |
    | `gateway.mac` | `gateway` | Its MAC on the CC network. |
-   | `gateway.routes` | `[]` | Networks behind CC routers: `["10.1.0.0/16 via 10.0.0.2"]`. The longest match wins. |
+   | `gateway.routes` | `[]` | Networks behind CC routers: `["10.1.0.0/16 via 10.1.0.2"]`. The longest match wins. |
    | `gateway.opRoutes` | `false` | Ops may change the routes in game (`/ccnix route add\|del`). Always on in singleplayer, where the player is the admin. |
    | `gateway.opMaxSubnet` | `16` | The largest network an op may route, as a prefix length: 16 allows a /16 or smaller. |
    | `gateway.vlans` | `1-4094` | The VLANs any gateway block may carry; VLAN 1 is the exchange (`"1,10,20-29"`). |
@@ -257,7 +257,7 @@ it, end to end.
    config:
 
    ```
-   /ccnix route add 10.2.0.0/16 via 10.0.0.3
+   /ccnix route add 10.2.0.0/16 via 10.1.0.3
    /ccnix route del 10.2.0.0/16
    ```
 
@@ -271,21 +271,21 @@ it, end to end.
 A router with a wired modem on the gateway's cable (`back`), and its own network on another modem:
 
 ```
-ip addr add back 10.0.0.2/24
-ip addr add left 10.1.0.1/24
-ip route add default via 10.0.0.1
+ip addr add back 10.1.0.2/24
+ip addr add left 10.1.1.1/24
+ip route add default via 10.1.0.1
 router boot
 ```
 
-Hosts behind it route at it (`ip route add default via 10.1.0.1`). The gateway needs a route back:
-`routes = ["10.1.0.0/16 via 10.0.0.2"]`. A host can also sit on the gateway's network itself, with
-`ip route add default via 10.0.0.1`.
+Hosts behind it route at it (`ip route add default via 10.1.1.1`). The gateway needs a route back:
+`routes = ["10.1.0.0/16 via 10.1.0.2"]`. A host can also sit on the gateway's network itself, with
+`ip route add default via 10.1.0.1`.
 
-A router on another block's cable is on the same exchange: give it `10.0.0.3/24` and its own network, and the
-routers can reach each other directly (`ip route add 10.1.3.0/24 via 10.0.0.3` on the first) as well as through the
+A router on another block's cable is on the same exchange: give it `10.1.0.3/24` and its own network, and the
+routers can reach each other directly (`ip route add 10.1.3.0/24 via 10.1.0.3` on the first) as well as through the
 gateway's routes.
 
-In TUN mode, `telnet 10.1.0.6` from the server reaches a CC computer running `telnetd`. Other machines reach CC's
+In TUN mode, `telnet 10.1.1.6` from the server reaches a CC computer running `telnetd`. Other machines reach CC's
 networks in one of two ways:
 - through the server, with a route to them on your real router and `FORWARD=1`;
 - or only outbound, with `NAT`.

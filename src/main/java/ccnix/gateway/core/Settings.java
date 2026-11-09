@@ -8,7 +8,7 @@ import java.util.List;
  * and routes to the networks behind CC routers there.
  */
 public record Settings(long ip, int prefix, int channel, String mac, List<Route> routes) {
-    public static final String DEFAULT_ADDRESS = "10.0.0.1/24";
+    public static final String DEFAULT_ADDRESS = "10.1.0.1/24";
     public static final int DEFAULT_CHANNEL = 60000;
     /** ccnix's MACs are 02:cc:<computer ID>:<port byte>; 02:cc:ff is the mod's. */
     public static final String DEFAULT_MAC = "02:cc:ff:00:00:00";

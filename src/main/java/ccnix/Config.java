@@ -39,10 +39,11 @@ public final class Config {
         .define("sourceCheck", true);
 
     public static final ModConfigSpec.ConfigValue<String> ADDRESS = BUILDER
-        .comment("The gateway's address and its network, a.b.c.d/len. Routers on the gateway's cable take addresses",
-            "on this network (ip addr add back 10.0.0.2/24) and route at this one (ip route add default via",
-            "10.0.0.1). Give the server's TUN device the same address (helper/ccnix-tun-setup), so packets",
-            "for it reach the server.")
+        .comment("The gateway's address and its network (the exchange), a.b.c.d/len. Routers on the gateway's cable",
+            "take addresses on this network (ip addr add back 10.1.0.2/24) and route at this one (ip route add",
+            "default via 10.1.0.1). Give the server's TUN device the same address (helper/ccnix-tun-setup), so",
+            "packets for it reach the server. Inside networks (as the default is), one route on the server's LAN",
+            "reaches the exchange and everything behind it.")
         .define("address", Settings.DEFAULT_ADDRESS);
 
     public static final ModConfigSpec.IntValue CHANNEL = BUILDER
@@ -57,10 +58,11 @@ public final class Config {
 
     public static final ModConfigSpec.ConfigValue<List<? extends String>> ROUTES = BUILDER
         .comment("Networks behind CC routers on the gateway's network, and the router for each:",
-            "[\"10.1.0.0/16 via 10.0.0.2\", \"10.2.0.0/16 via 10.0.0.3\"]. The gateway takes the longest match.",
+            "[\"10.1.0.0/16 via 10.1.0.2\", \"10.1.3.0/24 via 10.1.0.3\"]. The gateway takes the longest match, and",
+            "its own network is longer than a route around it.",
             "The server routes networks into the TUN device too (helper/ccnix-tun-setup): each route here needs to be",
             "inside one of those for anything from outside to reach it.")
-        .defineListAllowEmpty("routes", List.of(), () -> "10.1.0.0/16 via 10.0.0.2", o -> o instanceof String);
+        .defineListAllowEmpty("routes", List.of(), () -> "10.1.0.0/16 via 10.1.0.2", o -> o instanceof String);
 
     public static final ModConfigSpec.BooleanValue OP_ROUTES = BUILDER
         .comment("Ops may change the routes in game: /ccnix route add <net/len> via <router>, /ccnix route del <net/len>",
@@ -116,7 +118,7 @@ public final class Config {
         .defineInRange("udpIdle", 60, 5, 86400);
 
     public static final ModConfigSpec.ConfigValue<String> DNS_RELAY = BUILDER
-        .comment("Port 53 at the gateway's address (ip dns 10.0.0.1 on a CC computer):",
+        .comment("Port 53 at the gateway's address (ip dns 10.1.0.1 on a CC computer):",
             "  \"system\": relayed, unread, to the server's resolver (the first nameserver in /etc/resolv.conf); on",
             "            Windows, which has none to relay to, answered from the Windows resolver (A and PTR)",
             "  \"a.b.c.d\": relayed to that resolver",

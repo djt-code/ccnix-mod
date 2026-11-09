@@ -78,9 +78,24 @@ class OpRoutesTest {
 
     @Test
     void notTheGatewaysOwnNetworkNorTwice() {
-        assertTrue(problem("10.0.0.0/16 via 10.0.0.3").contains("overlaps the gateway's own network"));
+        assertTrue(problem("10.0.0.0/24 via 10.0.0.3").contains("is inside the gateway's own network"));
+        assertTrue(problem("10.0.0.128/25 via 10.0.0.3").contains("is inside the gateway's own network"));
         assertTrue(problem("10.1.0.0/16 via 10.0.0.3").contains("routed already (10.1.0.0/16 via 10.0.0.2)"));
         assertTrue(problem("10.1.0.0/16").contains("a.b.c.d/len via a.b.c.d"));
+    }
+
+    @Test
+    void aroundTheGatewaysOwnNetwork() {
+        // the default layout: the exchange 10.1.0.0/24 inside the CC networks, one router for the rest of them
+        var s = Settings.parse(Settings.DEFAULT_ADDRESS, Settings.DEFAULT_CHANNEL, Settings.DEFAULT_MAC, List.of(), new ArrayList<>());
+        var nets = List.of(NatConfig.net("10.1.0.0/16"));
+        var c = OpRoutes.add("10.1.0.0/16 via 10.1.0.2", s, 16, nets, null);
+        assertNull(c.problem(), "a route around the exchange");
+        var with = Settings.parse(Settings.DEFAULT_ADDRESS, Settings.DEFAULT_CHANNEL, Settings.DEFAULT_MAC,
+            List.of(c.route().toString()), new ArrayList<>());
+        assertEquals(Ipv4.parseIp("10.1.0.9"), with.nextHop(Ipv4.parseIp("10.1.0.9")), "the exchange: straight there");
+        assertEquals(Ipv4.parseIp("10.1.0.2"), with.nextHop(Ipv4.parseIp("10.1.7.9")), "the rest: the router");
+        assertTrue(OpRoutes.add("10.1.0.0/24 via 10.1.0.2", s, 16, nets, null).problem().contains("is inside the gateway's own network"));
     }
 
     @Test

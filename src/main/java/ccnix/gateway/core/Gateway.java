@@ -16,7 +16,7 @@ import java.util.function.LongSupplier;
  * exchange its blocks make.
  * <p>
  * The exchange: every gateway block is a port on one switch, as a switch's trunk ports are. Inside it every frame is
- * on a VLAN, 1-4094; VLAN 1 is the "routing exchange" (10.0.0.0/24, say, where routers peer, and where the gateway
+ * on a VLAN, 1-4094; VLAN 1 is the "routing exchange" (10.1.0.0/24 by default, where routers peer, and where the gateway
  * itself is). On a block's cable a VLAN is a modem channel: its native VLAN (1 unless set; or none) untagged, on the
  * gateway's channel, and every other VLAN tagged, on the channel + its number (lib/net's "back.20"), as a trunk port
  * carries them. A tagged frame for the native VLAN is dropped, so each VLAN has one way on and off a cable. Each block

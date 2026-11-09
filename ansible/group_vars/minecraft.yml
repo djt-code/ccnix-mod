@@ -33,10 +33,14 @@ ccnix_bundle: "{{ playbook_dir }}/../server-bundle.tar.gz"
 # process, no host setup; outbound TCP/UDP only, inbound through forwards).
 # The mod's own default is nat; this host has the TUN device, so tun.
 ccnix_gateway_mode: tun
-ccnix_gateway_address: 10.0.0.1/24
+# The exchange (the gateway's network, where CC routers on its cable take
+# addresses) and the gateway's address on it, which CC routers route at
+# and the TUN device takes.  Inside ccnix_cc_networks, so one route on the
+# LAN's router (10.1.0.0/16 via this host) reaches all of CC.
+ccnix_gateway_address: 10.1.0.1/24
 ccnix_gateway_channel: 60000     # ccnix's net.CHANNEL (4040 before ccnix 0.7.0)
 ccnix_gateway_mac: "02:cc:ff:00:00:00"
-ccnix_gateway_routes: ["10.1.0.0/16 via 10.0.0.2"]   # CC networks behind CC routers
+ccnix_gateway_routes: ["10.1.0.0/16 via 10.1.0.2"]   # CC networks behind CC routers
 # The CC networks the gateway carries, in both modes (gateway.networks):
 # every gateway route, ops' too, has to be inside one.  In TUN mode they're
 # routed into the device, in a routing table of their own (ccnix_tun_table)
