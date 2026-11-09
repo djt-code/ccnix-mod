@@ -78,8 +78,10 @@ final class CcWorld {
         if (netPath == null || !Files.exists(Path.of(netPath))) {
             throw new IllegalStateException("no lib/net.lua (ccnix.net = " + netPath + "): is the ccnix/ submodule checked out?");
         }
+        var loaded = installRequire(Path.of(netPath).getParent());
         var net = LuaThread.runMain(state, load(Files.newInputStream(Path.of(netPath)), "@lib/net.lua")).first();
         state.globals().rawset("N", net);
+        loaded.rawset("net", net);              // (require("net") is this one, the harness's)
         harness = (LuaTable) LuaThread.runMain(state, load(getClass().getResourceAsStream("harness.lua"), "@harness.lua"),
             net).first();
         state.globals().rawset("H", harness);
@@ -101,6 +103,40 @@ final class CcWorld {
     CcWorld sourceCheck(boolean on) {
         gateway.configureSources(on, sources);
         return this;
+    }
+
+    /**
+     * require, as CC gives a program: lib/net requires lib/scan (and others may follow). Each lib/*.lua is compiled
+     * here, not run; require runs one the first time it's asked for, and keeps what it returned (in the table
+     * returned here).
+     */
+    private LuaTable installRequire(Path libDir) throws Exception {
+        var loaders = new LuaTable();
+        try (var files = Files.list(libDir)) {
+            for (var file : (Iterable<Path>) files::iterator) {
+                var name = file.getFileName().toString();
+                if (name.endsWith(".lua")) {
+                    var module = name.substring(0, name.length() - 4);
+                    loaders.rawset(module, load(Files.newInputStream(file), "@lib/" + name));
+                }
+            }
+        }
+        var source = """
+            local loaders = ...
+            local loaded = {}
+            function require(name)
+                if loaded[name] == nil then
+                    local loader = loaders[name]
+                    if not loader then error("module '" .. tostring(name) .. "' not found", 2) end
+                    loaded[name] = loader(name)
+                    if loaded[name] == nil then loaded[name] = true end
+                end
+                return loaded[name]
+            end
+            return loaded
+            """;
+        return (LuaTable) LuaThread.runMain(state,
+            load(new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)), "@require"), loaders).first();
     }
 
     private LuaFunction load(InputStream in, String name) throws Exception {
@@ -158,9 +194,7 @@ final class CcWorld {
 
     /** Another of ccnix's libraries (lib/name.lua, beside net.lua) as the global name; its require("net") is N. */
     CcWorld library(String name) throws Exception {
-        var path = Path.of(System.getProperty("ccnix.net")).resolveSibling(name + ".lua");
-        lua("require = function(n) assert(n == 'net', n) return N end");
-        state.globals().rawset(name, LuaThread.runMain(state, load(Files.newInputStream(path), "@lib/" + name + ".lua")).first());
+        lua(name + " = require('" + name + "')");
         return this;
     }
 
