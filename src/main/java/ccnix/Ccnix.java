@@ -1,5 +1,6 @@
 package ccnix;
 
+import ccnix.gateway.CableScreenData;
 import ccnix.gateway.GatewayBlock;
 import ccnix.gateway.GatewayBlockEntity;
 import ccnix.gateway.GatewayFilter;
@@ -75,8 +76,9 @@ public final class Ccnix {
         });
         bus.addListener(RomPack::addTo);
         // (the version: a client and server whose payloads differ are refused, not left to misread them)
-        bus.addListener((RegisterPayloadHandlersEvent e) -> e.registrar("3")
+        bus.addListener((RegisterPayloadHandlersEvent e) -> e.registrar("4")
             .playToClient(GatewayScreenData.TYPE, GatewayScreenData.STREAM_CODEC, GatewayScreenData::handle)
+            .playToClient(CableScreenData.TYPE, CableScreenData.STREAM_CODEC, CableScreenData::handle)
             .playToServer(GatewayFilter.TYPE, GatewayFilter.STREAM_CODEC, GatewayFilter::handle)
             .playToServer(GatewayPoll.TYPE, GatewayPoll.STREAM_CODEC, GatewayPoll::handle));
         bus.addListener((ModConfigEvent.Reloading e) -> {

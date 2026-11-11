@@ -6,7 +6,6 @@ import dan200.computercraft.api.network.wired.WiredElementCapability;
 import dan200.computercraft.api.network.wired.WiredNetworkChange;
 import dan200.computercraft.api.network.wired.WiredNode;
 import dan200.computercraft.api.peripheral.IPeripheral;
-import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -31,13 +30,13 @@ import java.util.Set;
 import java.util.TreeMap;
 
 /**
- * What a Network Configurator shows of a CC cable network, clicked on one of its cables or wired modems: the
+ * What a Network Configurator shows (in its dialog) of a CC cable network, clicked on one of its cables or wired modems: the
  * peripherals its modems share, by the names computers on it use (drive_0, computer_12), and what sits beside each
  * modem without being shared (a computer using the modem). The names come from CC itself: a node of our own joins
  * the network for a moment, and CC tells it, as it tells a wired modem joining, every peripheral on it. The rest is
  * a walk along the cables in the world.
  */
-final class CableSurvey {
+public final class CableSurvey {
     /** As far as the walk goes, in blocks: a network bigger than that is shown in part. */
     private static final int MAX_BLOCKS = 4096;
 
@@ -45,54 +44,79 @@ final class CableSurvey {
     }
 
     /** Whether a block is one this looks at: CC's cable (with or without a modem on it) and its full-block modem. */
-    static boolean isCable(BlockState state) {
+    public static boolean isCable(BlockState state) {
         var key = BuiltInRegistries.BLOCK.getKey(state.getBlock());
         return key.getNamespace().equals("computercraft")
             && (key.getPath().equals("cable") || key.getPath().equals("wired_modem_full"));
     }
 
-    /** Tell player what's on the network at pos (clicked on face). */
+    /** Show player, in its dialog, what's on the network at pos (clicked on face). */
     static void show(ServerPlayer player, ServerLevel level, BlockPos pos, Direction face) {
         var start = elementAt(level, pos, face);
         if (start == null) {
-            player.sendSystemMessage(Component.literal("That isn't on a cable network").withStyle(ChatFormatting.GRAY));
+            player.displayClientMessage(Component.literal("That isn't on a cable network"), true);
             return;
         }
         var shared = sharedOn(level, pos, start);
         var walk = walk(level, pos);
+        var sections = new ArrayList<CableScreenData.Section>();
 
-        var out = new ArrayList<Component>();
-        out.add(Component.literal("Cable network at " + where(pos) + ": " + count(walk.cables, "cable") + ", "
-            + count(walk.modems, "modem") + (walk.gateways.isEmpty() ? "" : ", gateway " + String.join(", ", walk.gateways))
-            + (walk.cut ? " (more than " + MAX_BLOCKS + " blocks: shown in part)" : "")).withStyle(ChatFormatting.YELLOW));
+        var summary = new ArrayList<DialogRow>();
+        summary.add(new DialogRow("Cables", String.valueOf(walk.cables),
+            "The cables walked from where it was used, along every branch"));
+        summary.add(new DialogRow("Modems", String.valueOf(walk.modems),
+            "Wired modems on it: on a cable, or full blocks. Each shares what's beside it once it's turned on"));
+        summary.add(new DialogRow("Gateway blocks", walk.gateways.isEmpty() ? "none" : String.join(", ", walk.gateways),
+            "ccnix's Network Gateway blocks on it, by their IDs: the network reaches the server's through them"));
+        if (walk.cut) {
+            summary.add(new DialogRow("Walked", "the first " + MAX_BLOCKS + " blocks; there's more",
+                "A network this big is shown in part"));
+        }
+        sections.add(new CableScreenData.Section("", "", false, summary, ""));
 
-        out.add(Component.literal("Shared on it, by the names its computers use:").withStyle(ChatFormatting.GRAY));
+        var sharedRows = new ArrayList<DialogRow>();
         var sharedAt = new HashSet<BlockPos>();
-        if (shared.isEmpty()) out.add(Component.literal("  nothing (a modem shares what's beside it once it's turned on)"));
         for (var e : shared.entrySet()) {
             var at = e.getValue().getTarget() instanceof BlockEntity be ? be.getBlockPos() : null;
             if (at != null) sharedAt.add(at);
-            out.add(Component.literal("  " + e.getKey() + "  " + e.getValue().getType()
-                + (at != null ? "  " + describe(level, at) : "")));
+            sharedRows.add(new DialogRow(e.getKey(), e.getValue().getType() + (at != null ? ": " + describe(level, at) : ""),
+                "On any computer on this network: peripheral.wrap(\"" + e.getKey() + "\")"));
         }
+        sections.add(new CableScreenData.Section("Shared on it",
+            "The peripherals its modems share, by the names its computers use", false, sharedRows,
+            "Nothing: a modem shares what's beside it once it's turned on (right-click the modem)"));
 
-        var beside = new ArrayList<String>();
-        for (var at : walk.beside) if (!sharedAt.contains(at)) beside.add("  " + describe(level, at));
-        if (!beside.isEmpty()) {
-            out.add(Component.literal("Beside its modems, not shared (a computer there uses the modem):")
-                .withStyle(ChatFormatting.GRAY));
-            for (var line : beside) out.add(Component.literal(line));
+        var besideRows = new ArrayList<DialogRow>();
+        for (var at : walk.beside) {
+            if (sharedAt.contains(at)) continue;
+            var state = level.getBlockState(at);
+            var label = labelOf(level, at);
+            besideRows.add(new DialogRow(state.getBlock().getName().getString(),
+                (label == null ? "" : "\"" + label + "\", ") + "at " + where(at),
+                "Beside a modem, not shared on the network: a computer here uses the modem as its own (its"
+                    + " \"left\", \"back\" ...). Anything else is shared once the modem is turned on"));
         }
+        sections.add(new CableScreenData.Section("Beside its modems, not shared",
+            "What sits beside a modem without being shared: computers using it, mostly", false, besideRows, ""));
 
-        if (!walk.unloaded.isEmpty()) {
-            out.add(Component.literal("It goes on into chunks that aren't loaded, so what's beyond isn't shown, and"
-                + " isn't on the network until they load:").withStyle(ChatFormatting.GOLD));
-            for (var e : walk.unloaded.entrySet()) {
-                out.add(Component.literal("  chunk " + e.getKey().x + ", " + e.getKey().z + " (the cable at "
-                    + where(e.getValue()) + ")"));
-            }
+        var unloadedRows = new ArrayList<DialogRow>();
+        for (var e : walk.unloaded.entrySet()) {
+            unloadedRows.add(new DialogRow("Chunk " + e.getKey().x + ", " + e.getKey().z, "cable at " + where(e.getValue()),
+                "The cable runs on into this chunk, which isn't loaded"));
         }
-        for (var line : out) player.sendSystemMessage(line);
+        sections.add(new CableScreenData.Section("Into chunks that aren't loaded",
+            "What's beyond isn't shown here, and isn't on the network until they load", true, unloadedRows, ""));
+
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
+            new CableScreenData(pos, "Cable network", "from " + where(pos), sections));
+    }
+
+    /** A computer's label, or another named block's name; null if none. */
+    private static String labelOf(Level level, BlockPos at) {
+        if (level.getBlockEntity(at) instanceof Nameable n && n.hasCustomName() && n.getCustomName() != null) {
+            return n.getCustomName().getString();
+        }
+        return null;
     }
 
     /** CC's wired element at pos: on the clicked face first, then any side. */
@@ -202,20 +226,13 @@ final class CableSurvey {
 
     /** A block for a person: its name, a computer's label, where it is. */
     private static String describe(Level level, BlockPos at) {
-        var state = level.getBlockState(at);
-        var name = state.getBlock().getName().getString();
-        if (level.getBlockEntity(at) instanceof Nameable n && n.hasCustomName() && n.getCustomName() != null) {
-            name += " \"" + n.getCustomName().getString() + "\"";
-        }
-        return name + " at " + where(at);
+        var label = labelOf(level, at);
+        return level.getBlockState(at).getBlock().getName().getString() + (label == null ? "" : " \"" + label + "\"")
+            + " at " + where(at);
     }
 
     private static String where(BlockPos p) {
         return p.getX() + " " + p.getY() + " " + p.getZ();
-    }
-
-    private static String count(int n, String what) {
-        return n + " " + what + (n == 1 ? "" : "s");
     }
 
     /** Our node's element, for the moment it's on the network: it keeps what CC says was added. */

@@ -4,21 +4,15 @@ import ccnix.gateway.GatewayBlock;
 import ccnix.gateway.GatewayFilter;
 import ccnix.gateway.GatewayPoll;
 import ccnix.gateway.GatewayScreenData;
-import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.Util;
-import net.minecraft.client.KeyMapping;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.Options;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.FormattedText;
 import net.minecraft.util.FormattedCharSequence;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.lwjgl.glfw.GLFW;
 
@@ -26,17 +20,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A gateway block's dialog, drawn as the game's own container panels are: its state, what it is and has heard (live:
- * it asks again each second, and the frame counts show their rate), and, as a switch's trunk port has, its VLANs and
- * native VLAN, which its owner or an op may change. The pointer over a row says more. While no box is being typed in,
- * its player can still walk (a click anywhere but in a box leaves the box); it closes, as a container does, when they
- * walk away or the block goes.
+ * A gateway block's dialog: its state, what it is and has heard (live: it asks again each second, and the frame counts
+ * show their rate), and, as a switch's trunk port has, its VLANs and native VLAN, which its owner or an op may change.
+ * The rest (the panel, the rows, walking, closing) is Dialog's.
  */
-public final class GatewayScreen extends Screen {
-    private static final int W = 248, PAD = 8, ROW = 11, GAP = 8, TIP_WIDTH = 220, POLL_TICKS = 20;
-    // the game's container colours: panel, its light and dark edges, label text, quieter text
-    private static final int PANEL = 0xFFC6C6C6, LIGHT = 0xFFFFFFFF, DARK = 0xFF555555, EDGE = 0xFF000000;
-    private static final int TEXT = 0x404040, FAINT = 0x7A7A7A, GOOD = 0x1F7A1F, BAD = 0xA02020;
+public final class GatewayScreen extends Dialog {
+    private static final int W = 248, POLL_TICKS = 20;
     private static final String[] COUNTS = { "Frames in", "Frames out", "From other blocks", "Filtered" };
     private static final String[] COUNTS_MORE = {
         "Frames heard on this block's cable that went to the gateway",
@@ -54,21 +43,24 @@ public final class GatewayScreen extends Screen {
     private EditBox vlans, nativeVlan;
     private Button saveButton, doneButton;
     private String shownVlans, shownNative;             // the server's last; a box still showing it takes the next
-    private int left, top, panelHeight, stateY, rowsY, rule, vlansY, nativeY, messageY, valueX, lines;
+    private int stateY, rowsY, rule, vlansY, nativeY, messageY, valueX;
     private int ticks;
 
-    /** A row as shown: its label, its value cut into lines that fit, what the pointer over it says. */
-    private record Shown(String label, List<FormattedCharSequence> value, String more) {}
-
     GatewayScreen(GatewayScreenData data) {
-        super(Component.literal(data.title()));
+        super(Component.literal(data.title()), W);
         this.data = data;
         message = data.message();
         takeCounts(data);
     }
 
+    @Override
     BlockPos pos() {
         return data.pos();
+    }
+
+    @Override
+    boolean stillThere(BlockState state) {
+        return state.getBlock() instanceof GatewayBlock;
     }
 
     /**
@@ -117,33 +109,32 @@ public final class GatewayScreen extends Screen {
         lastAt = now;
     }
 
-    /** The rows as shown: the counts (with their rates), then the server's rows, each value cut to fit its column. */
+    /** The rows as shown: the counts (with their rates), then the server's rows. */
     private List<Shown> shown() {
         var out = new ArrayList<Shown>();
-        int room = W - PAD - valueX;
         var counts = data.counts();
         for (int i = 0; i < counts.size(); i++) {
             String value = String.format("%,d", counts.get(i)) + (haveRates && rates[i] >= 0.05 ? "  " + rate(rates[i]) : "");
-            out.add(new Shown(COUNTS[i], font.split(FormattedText.of(value), room), COUNTS_MORE[i]));
+            out.add(shown(COUNTS[i], value, COUNTS_MORE[i], valueX));
         }
-        for (var r : data.rows()) out.add(new Shown(r.label(), font.split(FormattedText.of(r.value()), room), r.more()));
+        for (var r : data.rows()) out.add(shown(r, valueX));
         return out;
     }
 
     /**
-     * Where everything goes: the label column as wide as its widest label, a value wrapping onto as many lines as it
-     * needs, and the panel as tall as that makes it. The widgets are moved, not made again, so a box keeps its focus.
+     * Where everything goes, the panel as tall as the rows make it. The widgets are moved, not made again, so a box
+     * keeps its focus.
      */
     private void layout() {
-        int labels = 0;
-        if (data.counts().size() == COUNTS.length) for (var l : COUNTS) labels = Math.max(labels, font.width(l));
-        for (var r : data.rows()) labels = Math.max(labels, font.width(r.label()));
-        valueX = PAD + labels + GAP;
-        lines = 0;
-        for (var s : shown()) lines += Math.max(1, s.value().size());
+        var labels = new ArrayList<String>();
+        if (data.counts().size() == COUNTS.length) labels.addAll(List.of(COUNTS));
+        for (var r : data.rows()) labels.add(r.label());
+        valueX = valueColumn(labels);
+        int lines = 0;
+        for (var s : shown()) lines += s.lines();
         // title, where, state; the rows; a rule; the VLANs' label and box; the native VLAN; a message; the buttons
         panelHeight = PAD + 24 + 14 + lines * ROW + 2 + 6 + 12 + 22 + 24 + 12 + 20 + PAD;
-        left = (width - W) / 2;
+        left = (width - w) / 2;
         top = Math.max(4, (height - panelHeight) / 2);
         int y = top + PAD + 24;
         stateY = y;
@@ -153,19 +144,19 @@ public final class GatewayScreen extends Screen {
         y += 12;
         vlans.setPosition(left + PAD, y);
         nativeY = y += 22;
-        nativeVlan.setPosition(left + W - PAD - 60, y);
+        nativeVlan.setPosition(left + w - PAD - 60, y);
         messageY = y += 24;
         y += 12;
-        int half = (W - 2 * PAD - 4) / 2;
+        int half = (w - 2 * PAD - 4) / 2;
         if (saveButton != null) saveButton.setPosition(left + PAD, y);
-        doneButton.setPosition(saveButton != null ? left + PAD + half + 4 : left + (W - half) / 2, y);
+        doneButton.setPosition(saveButton != null ? left + PAD + half + 4 : left + (w - half) / 2, y);
     }
 
     @Override
     protected void init() {
         boolean edit = data.canEdit();
         String locked = edit ? "" : "\nOnly its owner, or an op, can change it.";
-        vlans = addRenderableWidget(new EditBox(font, 0, 0, W - 2 * PAD, 18, Component.literal("VLANs")));
+        vlans = addRenderableWidget(new EditBox(font, 0, 0, w - 2 * PAD, 18, Component.literal("VLANs")));
         vlans.setMaxLength(200);
         vlans.setValue(data.vlans());
         vlans.setEditable(edit);
@@ -180,7 +171,7 @@ public final class GatewayScreen extends Screen {
         shownVlans = data.vlans();
         shownNative = data.nativeVlan();
 
-        int half = (W - 2 * PAD - 4) / 2;
+        int half = (w - 2 * PAD - 4) / 2;
         saveButton = edit
             ? addRenderableWidget(Button.builder(Component.literal("Save"), b -> save()).bounds(0, 0, half, 20).build())
             : null;
@@ -192,71 +183,22 @@ public final class GatewayScreen extends Screen {
         PacketDistributor.sendToServer(new GatewayFilter(data.pos(), vlans.getValue().trim(), nativeVlan.getValue().trim()));
     }
 
-    /** The keys that move the player: still theirs while the dialog is open and no box is being typed in. */
-    private static KeyMapping[] movementKeys(Options o) {
-        return new KeyMapping[] { o.keyUp, o.keyDown, o.keyLeft, o.keyRight, o.keyJump, o.keyShift, o.keySprint };
-    }
-
-    private boolean typing() {
-        return getFocused() instanceof EditBox;
-    }
-
-    /**
-     * A screen open takes the keyboard, and the game stops reading the movement keys; while no box has the focus,
-     * each tick sets them from the keys held, as if no screen were open, so its player can walk (and walk away). A box
-     * being typed in has them all let go.
-     */
-    private void passMovement(Minecraft mc) {
-        long window = mc.getWindow().getWindow();
-        for (var k : movementKeys(mc.options)) {
-            var key = k.getKey();
-            k.setDown(!typing() && key.getType() == InputConstants.Type.KEYSYM && key != InputConstants.UNKNOWN
-                && InputConstants.isKeyDown(window, key.getValue()));
-        }
-    }
-
     @Override
     public void tick() {
         super.tick();
-        var mc = minecraft;
-        if (mc == null || mc.player == null || mc.level == null) return;
-        passMovement(mc);
-        if (mc.player.distanceToSqr(Vec3.atCenterOf(data.pos())) > 64
-            || !(mc.level.getBlockState(data.pos()).getBlock() instanceof GatewayBlock)) {
-            onClose();
-            return;
+        if (minecraft != null && minecraft.screen == this && ++ticks % POLL_TICKS == 0) {
+            PacketDistributor.sendToServer(new GatewayPoll(data.pos()));
         }
-        if (++ticks % POLL_TICKS == 0) PacketDistributor.sendToServer(new GatewayPoll(data.pos()));
     }
 
-    /**
-     * Enter in a box saves, as Done would close. With no box focused, a movement key is the player's (tick passes it
-     * on), not the screen's: it doesn't press a button or move the focus.
-     */
+    /** Enter in a box saves, as Done would close. */
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
         if ((key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) && data.canEdit() && typing()) {
             save();
             return true;
         }
-        if (!typing() && minecraft != null) {
-            for (var k : movementKeys(minecraft.options)) if (k.matches(key, scan)) return true;
-        }
         return super.keyPressed(key, scan, modifiers);
-    }
-
-    /** A click anywhere but in a box takes the focus off the boxes (a button still does what it does). */
-    @Override
-    public boolean mouseClicked(double x, double y, int button) {
-        boolean used = super.mouseClicked(x, y, button);
-        if (!(getFocused() instanceof EditBox box && box.isMouseOver(x, y))) setFocused(null);
-        return used;
-    }
-
-    @Override
-    public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        super.renderBackground(g, mouseX, mouseY, partialTick);
-        panel(g, left, top, W, panelHeight);
     }
 
     @Override
@@ -278,71 +220,24 @@ public final class GatewayScreen extends Screen {
         List<FormattedCharSequence> tip = null;
         int y = rowsY;
         for (var s : shown()) {
-            var t = row(g, s, y, mouseX, mouseY);
+            var t = drawRow(g, s, valueX, y, mouseX, mouseY);
             if (t != null) tip = t;
-            y += Math.max(1, s.value().size()) * ROW;
+            y += s.lines() * ROW;
         }
 
-        // engraved, as the game's panels divide
-        g.fill(left + PAD, rule, left + W - PAD, rule + 1, 0xFF8B8B8B);
-        g.fill(left + PAD, rule + 1, left + W - PAD, rule + 2, LIGHT);
+        rule(g, rule);
         g.drawString(font, "VLANs it carries", left + PAD, vlansY, TEXT, false);
         g.drawString(font, "Native (untagged) VLAN", left + PAD, nativeY + 5, TEXT, false);
         if (!data.canEdit()) {
             g.drawString(font, "Only its owner, or an op, can change its VLANs", left + PAD, messageY, FAINT, false);
         } else if (!message.isEmpty()) {
-            g.drawString(font, font.plainSubstrByWidth(message, W - 2 * PAD), left + PAD, messageY,
+            g.drawString(font, font.plainSubstrByWidth(message, w - 2 * PAD), left + PAD, messageY,
                 message.equals("Saved") ? GOOD : BAD, false);
         }
         if (tip != null) g.renderTooltip(font, tip, mouseX, mouseY);
     }
 
-    /** A label and its value's lines; what to say if the pointer is over the row, else null. */
-    private List<FormattedCharSequence> row(GuiGraphics g, Shown s, int y, int mouseX, int mouseY) {
-        g.drawString(font, s.label(), left + PAD, y, FAINT, false);
-        int ly = y;
-        for (var line : s.value()) {
-            g.drawString(font, line, left + valueX, ly, TEXT, false);
-            ly += ROW;
-        }
-        int bottom = y + Math.max(1, s.value().size()) * ROW;
-        boolean over = mouseX >= left + PAD && mouseX < left + W - PAD && mouseY >= y - 1 && mouseY < bottom - 1;
-        if (!over) return null;
-        var tip = new ArrayList<FormattedCharSequence>();
-        for (var line : s.more().split("\n")) if (!line.isEmpty()) tip.addAll(font.split(FormattedText.of(line), TIP_WIDTH));
-        return tip.isEmpty() ? null : tip;
-    }
-
     private static String rate(double perSecond) {
         return "(" + (perSecond < 10 ? String.format("%.1f", perSecond) : String.format("%,d", Math.round(perSecond))) + "/s)";
-    }
-
-    private void centred(GuiGraphics g, String s, int y, int colour) {
-        g.drawString(font, s, left + (W - font.width(s)) / 2, y, colour, false);
-    }
-
-    /** A panel as the game's containers have: a dark outline with its corners cut, light top and left, dark bottom and right. */
-    private static void panel(GuiGraphics g, int x, int y, int w, int h) {
-        int r = x + w, b = y + h;
-        g.fill(x + 2, y, r - 2, y + 1, EDGE);
-        g.fill(x + 2, b - 1, r - 2, b, EDGE);
-        g.fill(x, y + 2, x + 1, b - 2, EDGE);
-        g.fill(r - 1, y + 2, r, b - 2, EDGE);
-        g.fill(x + 1, y + 1, x + 2, y + 2, EDGE);
-        g.fill(r - 2, y + 1, r - 1, y + 2, EDGE);
-        g.fill(x + 1, b - 2, x + 2, b - 1, EDGE);
-        g.fill(r - 2, b - 2, r - 1, b - 1, EDGE);
-        g.fill(x + 1, y + 2, r - 1, b - 2, PANEL);
-        g.fill(x + 2, y + 1, r - 2, y + 2, PANEL);
-        g.fill(x + 2, b - 2, r - 2, b - 1, PANEL);
-        g.fill(x + 2, y + 1, r - 3, y + 3, LIGHT);
-        g.fill(x + 1, y + 2, x + 3, b - 3, LIGHT);
-        g.fill(x + 3, b - 3, r - 2, b - 1, DARK);
-        g.fill(r - 3, y + 3, r - 1, b - 2, DARK);
-    }
-
-    @Override
-    public boolean isPauseScreen() {
-        return false;
     }
 }

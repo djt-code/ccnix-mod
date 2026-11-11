@@ -21,20 +21,10 @@ import java.util.List;
  * VLAN, whether this player may change them, and what the last change said.
  */
 public record GatewayScreenData(BlockPos pos, boolean refresh, String title, String subtitle, int state, String stateText,
-                                List<Row> rows, List<Long> counts, String vlans, String nativeVlan, boolean canEdit,
+                                List<DialogRow> rows, List<Long> counts, String vlans, String nativeVlan, boolean canEdit,
                                 String message) implements CustomPacketPayload {
     public static final int WORKING = 0, STANDBY = 1, DOWN = 2;
 
-    /** A label, its value, and more said when the pointer is over it ("" none; lines split at \n). */
-    public record Row(String label, String value, String more) {
-        static final StreamCodec<RegistryFriendlyByteBuf, Row> STREAM_CODEC = StreamCodec.composite(
-            ByteBufCodecs.STRING_UTF8, Row::label,
-            ByteBufCodecs.STRING_UTF8, Row::value,
-            ByteBufCodecs.STRING_UTF8, Row::more,
-            Row::new);
-    }
-
-    private static final StreamCodec<RegistryFriendlyByteBuf, List<Row>> ROWS = Row.STREAM_CODEC.apply(ByteBufCodecs.list());
     private static final StreamCodec<io.netty.buffer.ByteBuf, List<Long>> COUNTS = ByteBufCodecs.VAR_LONG.apply(ByteBufCodecs.list());
 
     public static final Type<GatewayScreenData> TYPE =
@@ -49,7 +39,7 @@ public record GatewayScreenData(BlockPos pos, boolean refresh, String title, Str
         buf.writeUtf(subtitle);
         buf.writeVarInt(state);
         buf.writeUtf(stateText);
-        ROWS.encode(buf, rows);
+        DialogRow.LIST.encode(buf, rows);
         COUNTS.encode(buf, counts);
         buf.writeUtf(vlans);
         buf.writeUtf(nativeVlan);
@@ -59,7 +49,7 @@ public record GatewayScreenData(BlockPos pos, boolean refresh, String title, Str
 
     private static GatewayScreenData read(RegistryFriendlyByteBuf buf) {
         return new GatewayScreenData(BlockPos.STREAM_CODEC.decode(buf), buf.readBoolean(), buf.readUtf(), buf.readUtf(),
-            buf.readVarInt(), buf.readUtf(), ROWS.decode(buf), COUNTS.decode(buf), buf.readUtf(), buf.readUtf(),
+            buf.readVarInt(), buf.readUtf(), DialogRow.LIST.decode(buf), COUNTS.decode(buf), buf.readUtf(), buf.readUtf(),
             buf.readBoolean(), buf.readUtf());
     }
 

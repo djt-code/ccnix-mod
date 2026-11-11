@@ -1,5 +1,6 @@
 package ccnix.client;
 
+import ccnix.gateway.CableScreenData;
 import ccnix.gateway.GatewayScreenData;
 import net.minecraft.client.Minecraft;
 
@@ -16,5 +17,10 @@ public final class ClientAccess {
         } else if (!data.refresh()) {
             mc.setScreen(new GatewayScreen(data));
         }
+    }
+
+    /** What a Network Configurator found on a cable network: its dialog. */
+    public static void cable(CableScreenData data) {
+        Minecraft.getInstance().setScreen(new CableScreen(data));
     }
 }

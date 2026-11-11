@@ -6,7 +6,7 @@ license="${mod_license}"
 modId="${mod_id}"
 version="${mod_version}"
 displayName="${mod_name}"
-authors="Dan Theisen"
+authors="Dan Theisen [WI7FI]"
 credits="Built on CC: Tweaked (the CC: Tweaked developers; ComputerCraft by Daniel Ratcliffe) and NeoForge. The ROM includes etlua by Leaf Corcoran (MIT). Inspired by the work of Natanael Copa (Alpine Linux), Rich Felker (musl) and Daniel Stenberg (curl), with thanks."
 description='''
 ccnix, a small Unix-like distribution for CC: Tweaked, in every computer's ROM, updated with git; and a block that joins ComputerCraft's wired network to a real one, so computers running ccnix's network stack reach real IPv4 hosts. In NAT mode (the default, and singleplayer's) the server's own address stands in for them on the connections they open, with nothing to set up. In TUN mode a TUN device on a Linux server routes them, and real hosts reach them too.
