@@ -4,7 +4,11 @@ import ccnix.gateway.GatewayBlock;
 import ccnix.gateway.GatewayFilter;
 import ccnix.gateway.GatewayPoll;
 import ccnix.gateway.GatewayScreenData;
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.Util;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.Options;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -24,8 +28,9 @@ import java.util.List;
 /**
  * A gateway block's dialog, drawn as the game's own container panels are: its state, what it is and has heard (live:
  * it asks again each second, and the frame counts show their rate), and, as a switch's trunk port has, its VLANs and
- * native VLAN, which its owner or an op may change. The pointer over a row says more. It closes, as a container does,
- * when its player walks away or the block goes.
+ * native VLAN, which its owner or an op may change. The pointer over a row says more. While no box is being typed in,
+ * its player can still walk (a click anywhere but in a box leaves the box); it closes, as a container does, when they
+ * walk away or the block goes.
  */
 public final class GatewayScreen extends Screen {
     private static final int W = 248, PAD = 8, ROW = 11, GAP = 8, TIP_WIDTH = 220, POLL_TICKS = 20;
@@ -187,11 +192,35 @@ public final class GatewayScreen extends Screen {
         PacketDistributor.sendToServer(new GatewayFilter(data.pos(), vlans.getValue().trim(), nativeVlan.getValue().trim()));
     }
 
+    /** The keys that move the player: still theirs while the dialog is open and no box is being typed in. */
+    private static KeyMapping[] movementKeys(Options o) {
+        return new KeyMapping[] { o.keyUp, o.keyDown, o.keyLeft, o.keyRight, o.keyJump, o.keyShift, o.keySprint };
+    }
+
+    private boolean typing() {
+        return getFocused() instanceof EditBox;
+    }
+
+    /**
+     * A screen open takes the keyboard, and the game stops reading the movement keys; while no box has the focus,
+     * each tick sets them from the keys held, as if no screen were open, so its player can walk (and walk away). A box
+     * being typed in has them all let go.
+     */
+    private void passMovement(Minecraft mc) {
+        long window = mc.getWindow().getWindow();
+        for (var k : movementKeys(mc.options)) {
+            var key = k.getKey();
+            k.setDown(!typing() && key.getType() == InputConstants.Type.KEYSYM && key != InputConstants.UNKNOWN
+                && InputConstants.isKeyDown(window, key.getValue()));
+        }
+    }
+
     @Override
     public void tick() {
         super.tick();
         var mc = minecraft;
         if (mc == null || mc.player == null || mc.level == null) return;
+        passMovement(mc);
         if (mc.player.distanceToSqr(Vec3.atCenterOf(data.pos())) > 64
             || !(mc.level.getBlockState(data.pos()).getBlock() instanceof GatewayBlock)) {
             onClose();
@@ -200,15 +229,28 @@ public final class GatewayScreen extends Screen {
         if (++ticks % POLL_TICKS == 0) PacketDistributor.sendToServer(new GatewayPoll(data.pos()));
     }
 
-    /** Enter in a box saves, as Done would close. */
+    /**
+     * Enter in a box saves, as Done would close. With no box focused, a movement key is the player's (tick passes it
+     * on), not the screen's: it doesn't press a button or move the focus.
+     */
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
-        if ((key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) && data.canEdit()
-            && (vlans.isFocused() || nativeVlan.isFocused())) {
+        if ((key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) && data.canEdit() && typing()) {
             save();
             return true;
         }
+        if (!typing() && minecraft != null) {
+            for (var k : movementKeys(minecraft.options)) if (k.matches(key, scan)) return true;
+        }
         return super.keyPressed(key, scan, modifiers);
+    }
+
+    /** A click anywhere but in a box takes the focus off the boxes (a button still does what it does). */
+    @Override
+    public boolean mouseClicked(double x, double y, int button) {
+        boolean used = super.mouseClicked(x, y, button);
+        if (!(getFocused() instanceof EditBox box && box.isMouseOver(x, y))) setFocused(null);
+        return used;
     }
 
     @Override
