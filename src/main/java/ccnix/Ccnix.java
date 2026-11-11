@@ -6,11 +6,12 @@ import ccnix.gateway.GatewayFilter;
 import ccnix.gateway.GatewayScreenData;
 import ccnix.gateway.GatewayItem;
 import ccnix.gateway.GatewayPoll;
-import ccnix.gateway.NetworkTesterItem;
+import ccnix.gateway.NetworkConfiguratorItem;
 import ccnix.gateway.Service;
 import ccnix.rom.RomPack;
 import dan200.computercraft.api.network.wired.WiredElementCapability;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
@@ -53,13 +54,15 @@ public final class Ccnix {
     public static final DeferredItem<BlockItem> GATEWAY_ITEM = ITEMS.register("gateway",
         () -> new GatewayItem(GATEWAY.get(), new Item.Properties()));
     /** Used on a gateway block, it opens its dialog. */
-    public static final DeferredItem<NetworkTesterItem> NETWORK_TESTER = ITEMS.register("network_tester",
-        () -> new NetworkTesterItem(new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<NetworkConfiguratorItem> NETWORK_CONFIGURATOR = ITEMS.register("network_configurator",
+        () -> new NetworkConfiguratorItem(new Item.Properties().stacksTo(1)));
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<GatewayBlockEntity>> GATEWAY_ENTITY =
         BLOCK_ENTITIES.register("gateway", () -> BlockEntityType.Builder.of(GatewayBlockEntity::new, GATEWAY.get()).build(null));
 
     public Ccnix(IEventBus bus, ModContainer container) {
         BLOCKS.register(bus);
+        // (it was the Network Tester before 0.23.0: one of those is a configurator now)
+        ITEMS.addAlias(ResourceLocation.fromNamespaceAndPath(ID, "network_tester"), NETWORK_CONFIGURATOR.getId());
         ITEMS.register(bus);
         BLOCK_ENTITIES.register(bus);
         container.registerConfig(ModConfig.Type.SERVER, Config.SPEC);
@@ -68,7 +71,7 @@ public final class Ccnix {
             e.registerBlockEntity(WiredElementCapability.get(), GATEWAY_ENTITY.get(), (be, side) -> be.element(side)));
         bus.addListener((BuildCreativeModeTabContentsEvent e) -> {
             if (e.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) e.accept(GATEWAY_ITEM);
-            if (e.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) e.accept(NETWORK_TESTER);
+            if (e.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) e.accept(NETWORK_CONFIGURATOR);
         });
         bus.addListener(RomPack::addTo);
         // (the version: a client and server whose payloads differ are refused, not left to misread them)

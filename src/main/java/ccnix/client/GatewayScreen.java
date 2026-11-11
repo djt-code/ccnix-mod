@@ -28,7 +28,7 @@ import java.util.List;
  * when its player walks away or the block goes.
  */
 public final class GatewayScreen extends Screen {
-    private static final int W = 248, PAD = 8, ROW = 11, VALUE_X = 92, TIP_WIDTH = 220, POLL_TICKS = 20;
+    private static final int W = 248, PAD = 8, ROW = 11, GAP = 8, TIP_WIDTH = 220, POLL_TICKS = 20;
     // the game's container colours: panel, its light and dark edges, label text, quieter text
     private static final int PANEL = 0xFFC6C6C6, LIGHT = 0xFFFFFFFF, DARK = 0xFF555555, EDGE = 0xFF000000;
     private static final int TEXT = 0x404040, FAINT = 0x7A7A7A, GOOD = 0x1F7A1F, BAD = 0xA02020;
@@ -47,9 +47,13 @@ public final class GatewayScreen extends Screen {
     private final double[] rates = new double[COUNTS.length];
     private boolean haveRates;
     private EditBox vlans, nativeVlan;
+    private Button saveButton, doneButton;
     private String shownVlans, shownNative;             // the server's last; a box still showing it takes the next
-    private int left, top, panelHeight, stateY, rowsY, rule, vlansY, nativeY, messageY;
+    private int left, top, panelHeight, stateY, rowsY, rule, vlansY, nativeY, messageY, valueX, lines;
     private int ticks;
+
+    /** A row as shown: its label, its value cut into lines that fit, what the pointer over it says. */
+    private record Shown(String label, List<FormattedCharSequence> value, String more) {}
 
     GatewayScreen(GatewayScreenData data) {
         super(Component.literal(data.title()));
@@ -62,21 +66,32 @@ public final class GatewayScreen extends Screen {
         return data.pos();
     }
 
-    /** Newer stats, or the answer to a change: the rows and counts redrawn, the boxes kept if edited meanwhile. */
+    /**
+     * Newer stats, or the answer to a change: the rows and counts redrawn, the panel grown or shrunk to them. A box
+     * takes the server's value only when it's the answer to a save, or it isn't being edited (not focused, and still
+     * showing the last value): one being typed in is never touched, so its text and cursor stay as they are.
+     */
     void update(GatewayScreenData d) {
         takeCounts(d);
         var oldVlans = shownVlans;
         var oldNative = shownNative;
-        String typedVlans = vlans.getValue(), typedNative = nativeVlan.getValue();
-        boolean reshaped = d.rows().size() != data.rows().size() || d.counts().size() != data.counts().size()
-            || d.canEdit() != data.canEdit();
+        boolean buttonsChange = d.canEdit() != data.canEdit();
         data = d;
         if (!d.refresh()) message = d.message();
-        if (reshaped) rebuildWidgets();                 // (init: the boxes take the server's values)
-        vlans.setValue(typedVlans.equals(oldVlans) ? d.vlans() : typedVlans);
-        nativeVlan.setValue(typedNative.equals(oldNative) ? d.nativeVlan() : typedNative);
+        if (buttonsChange) {
+            rebuildWidgets();                           // (init: the boxes take the server's values)
+        } else {
+            take(vlans, oldVlans, d.vlans(), !d.refresh());
+            take(nativeVlan, oldNative, d.nativeVlan(), !d.refresh());
+            layout();
+        }
         shownVlans = d.vlans();
         shownNative = d.nativeVlan();
+    }
+
+    private static void take(EditBox box, String shown, String now, boolean answer) {
+        boolean untouched = !box.isFocused() && box.getValue().equals(shown);
+        if ((answer || untouched) && !box.getValue().equals(now)) box.setValue(now);
     }
 
     /** The counts' rates since the last ones. */
@@ -97,30 +112,61 @@ public final class GatewayScreen extends Screen {
         lastAt = now;
     }
 
-    @Override
-    protected void init() {
-        int rows = data.counts().size() + data.rows().size();
+    /** The rows as shown: the counts (with their rates), then the server's rows, each value cut to fit its column. */
+    private List<Shown> shown() {
+        var out = new ArrayList<Shown>();
+        int room = W - PAD - valueX;
+        var counts = data.counts();
+        for (int i = 0; i < counts.size(); i++) {
+            String value = String.format("%,d", counts.get(i)) + (haveRates && rates[i] >= 0.05 ? "  " + rate(rates[i]) : "");
+            out.add(new Shown(COUNTS[i], font.split(FormattedText.of(value), room), COUNTS_MORE[i]));
+        }
+        for (var r : data.rows()) out.add(new Shown(r.label(), font.split(FormattedText.of(r.value()), room), r.more()));
+        return out;
+    }
+
+    /**
+     * Where everything goes: the label column as wide as its widest label, a value wrapping onto as many lines as it
+     * needs, and the panel as tall as that makes it. The widgets are moved, not made again, so a box keeps its focus.
+     */
+    private void layout() {
+        int labels = 0;
+        if (data.counts().size() == COUNTS.length) for (var l : COUNTS) labels = Math.max(labels, font.width(l));
+        for (var r : data.rows()) labels = Math.max(labels, font.width(r.label()));
+        valueX = PAD + labels + GAP;
+        lines = 0;
+        for (var s : shown()) lines += Math.max(1, s.value().size());
         // title, where, state; the rows; a rule; the VLANs' label and box; the native VLAN; a message; the buttons
-        panelHeight = PAD + 24 + 14 + rows * ROW + 2 + 6 + 12 + 22 + 24 + 12 + 20 + PAD;
+        panelHeight = PAD + 24 + 14 + lines * ROW + 2 + 6 + 12 + 22 + 24 + 12 + 20 + PAD;
         left = (width - W) / 2;
         top = Math.max(4, (height - panelHeight) / 2);
         int y = top + PAD + 24;
         stateY = y;
         rowsY = y += 14;
-        rule = y += rows * ROW + 2;
+        rule = y += lines * ROW + 2;
         vlansY = y += 6;
         y += 12;
+        vlans.setPosition(left + PAD, y);
+        nativeY = y += 22;
+        nativeVlan.setPosition(left + W - PAD - 60, y);
+        messageY = y += 24;
+        y += 12;
+        int half = (W - 2 * PAD - 4) / 2;
+        if (saveButton != null) saveButton.setPosition(left + PAD, y);
+        doneButton.setPosition(saveButton != null ? left + PAD + half + 4 : left + (W - half) / 2, y);
+    }
 
+    @Override
+    protected void init() {
         boolean edit = data.canEdit();
         String locked = edit ? "" : "\nOnly its owner, or an op, can change it.";
-        vlans = addRenderableWidget(new EditBox(font, left + PAD, y, W - 2 * PAD, 18, Component.literal("VLANs")));
+        vlans = addRenderableWidget(new EditBox(font, 0, 0, W - 2 * PAD, 18, Component.literal("VLANs")));
         vlans.setMaxLength(200);
         vlans.setValue(data.vlans());
         vlans.setEditable(edit);
         vlans.setTooltip(Tooltip.create(Component.literal("The VLANs this block carries: \"1-4094\" all, \"2-4094\" a"
             + " trunk without the exchange, \"1,10,20-29\". VLAN 1 is the exchange." + locked)));
-        nativeY = y += 22;
-        nativeVlan = addRenderableWidget(new EditBox(font, left + W - PAD - 60, y, 60, 18, Component.literal("Native VLAN")));
+        nativeVlan = addRenderableWidget(new EditBox(font, 0, 0, 60, 18, Component.literal("Native VLAN")));
         nativeVlan.setMaxLength(8);
         nativeVlan.setValue(data.nativeVlan());
         nativeVlan.setEditable(edit);
@@ -128,15 +174,13 @@ public final class GatewayScreen extends Screen {
             + " VLANs, or \"none\" (every VLAN tagged, as back.N)." + locked)));
         shownVlans = data.vlans();
         shownNative = data.nativeVlan();
-        messageY = y += 24;
-        y += 12;
 
         int half = (W - 2 * PAD - 4) / 2;
-        if (edit) {
-            addRenderableWidget(Button.builder(Component.literal("Save"), b -> save()).bounds(left + PAD, y, half, 20).build());
-        }
-        addRenderableWidget(Button.builder(Component.literal("Done"), b -> onClose())
-            .bounds(edit ? left + PAD + half + 4 : left + (W - half) / 2, y, half, 20).build());
+        saveButton = edit
+            ? addRenderableWidget(Button.builder(Component.literal("Save"), b -> save()).bounds(0, 0, half, 20).build())
+            : null;
+        doneButton = addRenderableWidget(Button.builder(Component.literal("Done"), b -> onClose()).bounds(0, 0, half, 20).build());
+        layout();
     }
 
     private void save() {
@@ -191,17 +235,10 @@ public final class GatewayScreen extends Screen {
 
         List<FormattedCharSequence> tip = null;
         int y = rowsY;
-        var counts = data.counts();
-        for (int i = 0; i < counts.size(); i++) {
-            String value = String.format("%,d", counts.get(i)) + (haveRates && rates[i] >= 0.05 ? "  " + rate(rates[i]) : "");
-            var t = row(g, COUNTS[i], value, COUNTS_MORE[i], y, mouseX, mouseY);
+        for (var s : shown()) {
+            var t = row(g, s, y, mouseX, mouseY);
             if (t != null) tip = t;
-            y += ROW;
-        }
-        for (var r : data.rows()) {
-            var t = row(g, r.label(), r.value(), r.more(), y, mouseX, mouseY);
-            if (t != null) tip = t;
-            y += ROW;
+            y += Math.max(1, s.value().size()) * ROW;
         }
 
         // engraved, as the game's panels divide
@@ -218,19 +255,20 @@ public final class GatewayScreen extends Screen {
         if (tip != null) g.renderTooltip(font, tip, mouseX, mouseY);
     }
 
-    /** A label and its value (cut to fit); what to say if the pointer is over it, else null. */
-    private List<FormattedCharSequence> row(GuiGraphics g, String label, String value, String more, int y, int mouseX, int mouseY) {
-        int room = W - PAD - VALUE_X;
-        String shown = value;
-        if (font.width(value) > room) shown = font.plainSubstrByWidth(value, room - font.width("...")) + "...";
-        g.drawString(font, label, left + PAD, y, FAINT, false);
-        g.drawString(font, shown, left + VALUE_X, y, TEXT, false);
-        boolean over = mouseX >= left + PAD && mouseX < left + W - PAD && mouseY >= y - 1 && mouseY < y + ROW - 1;
+    /** A label and its value's lines; what to say if the pointer is over the row, else null. */
+    private List<FormattedCharSequence> row(GuiGraphics g, Shown s, int y, int mouseX, int mouseY) {
+        g.drawString(font, s.label(), left + PAD, y, FAINT, false);
+        int ly = y;
+        for (var line : s.value()) {
+            g.drawString(font, line, left + valueX, ly, TEXT, false);
+            ly += ROW;
+        }
+        int bottom = y + Math.max(1, s.value().size()) * ROW;
+        boolean over = mouseX >= left + PAD && mouseX < left + W - PAD && mouseY >= y - 1 && mouseY < bottom - 1;
         if (!over) return null;
-        var lines = new ArrayList<FormattedCharSequence>();
-        if (!shown.equals(value)) lines.addAll(font.split(FormattedText.of(value), TIP_WIDTH));
-        for (var line : more.split("\n")) if (!line.isEmpty()) lines.addAll(font.split(FormattedText.of(line), TIP_WIDTH));
-        return lines.isEmpty() ? null : lines;
+        var tip = new ArrayList<FormattedCharSequence>();
+        for (var line : s.more().split("\n")) if (!line.isEmpty()) tip.addAll(font.split(FormattedText.of(line), TIP_WIDTH));
+        return tip.isEmpty() ? null : tip;
     }
 
     private static String rate(double perSecond) {

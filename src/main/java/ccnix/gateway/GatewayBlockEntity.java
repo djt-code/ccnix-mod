@@ -206,12 +206,18 @@ public final class GatewayBlockEntity extends BlockEntity implements Gateway.Por
             state = GatewayScreenData.DOWN;
             stateText = "The gateway isn't running (/ccnix says why)";
         } else {
-            rows.add(new GatewayScreenData.Row("Gateway", v.address() + ", " + v.mode() + " mode",
+            // (one fact a row, short: the dialog wraps a long value, and more goes in a row of its own)
+            rows.add(new GatewayScreenData.Row("Gateway", v.address(),
                 "The server's address on the exchange (VLAN 1), on modem channel " + v.channel()));
-            rows.add(new GatewayScreenData.Row("Untagged", nativeVlan == 0 ? "nothing: every VLAN tagged"
-                : nativeVlan == 1 ? "VLAN 1, the exchange" : "VLAN " + nativeVlan + " (the exchange as back.1)",
+            rows.add(new GatewayScreenData.Row("Mode", v.mode().toUpperCase(java.util.Locale.ROOT),
+                "TUN: the server routes the CC networks through its TUN device. NAT: the server's own address stands"
+                    + " in for them, on the connections they open (its config's gateway.mode)"));
+            rows.add(new GatewayScreenData.Row("Untagged", nativeVlan == 0 ? "none" : "VLAN " + nativeVlan,
                 "What this block's cable carries untagged (its native VLAN). Every other VLAN goes tagged, on channel "
                     + v.channel() + " + the VLAN (lib/net's back.20)"));
+            rows.add(new GatewayScreenData.Row("Exchange", nativeVlan == 1 ? "untagged" : "tagged, as back.1",
+                "How a computer on this block's cable reaches the exchange (VLAN 1): on its modem's own channel, or"
+                    + " on channel " + (v.channel() + 1) + " as the interface back.1"));
             var port = v.port();
             if (port == null) {
                 state = GatewayScreenData.DOWN;
@@ -219,7 +225,7 @@ public final class GatewayBlockEntity extends BlockEntity implements Gateway.Por
             } else if (port.standby()) {
                 state = GatewayScreenData.STANDBY;
                 stateText = "Standing by";
-                rows.add(new GatewayScreenData.Row("Standing by", "another block works this network",
+                rows.add(new GatewayScreenData.Row("Its network", "another block works it",
                     "Only one gateway block works each cable network. This one takes over if that one goes (its chunk"
                         + " unloads, or it's broken)"));
             } else {
@@ -229,9 +235,10 @@ public final class GatewayBlockEntity extends BlockEntity implements Gateway.Por
                 rows.add(new GatewayScreenData.Row("MACs heard", String.valueOf(port.macs().size()),
                     port.macs().isEmpty() ? "None heard on this block's cable lately" : String.join("\n", port.macs())));
                 rows.add(new GatewayScreenData.Row("VLANs seen", port.vlansSeen(), "The VLANs frames came in on here"));
-                rows.add(new GatewayScreenData.Row("Its network", port.sharing() == 0 ? "the only block on it"
-                    : port.sharing() + (port.sharing() == 1 ? " other block stands by" : " other blocks stand by"),
-                    "Only one gateway block works each cable network: others on it stand by"));
+                rows.add(new GatewayScreenData.Row("Standing by", port.sharing() == 0 ? "no other block"
+                    : port.sharing() + (port.sharing() == 1 ? " other block" : " other blocks"),
+                    "Only one gateway block works each cable network: others on it stand by, and one takes over if"
+                        + " this one goes"));
             }
             rows.add(new GatewayScreenData.Row("Server carries", v.serverVlans(),
                 "The VLANs the server lets any block carry (its config's gateway.vlans)"));

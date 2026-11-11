@@ -12,5 +12,5 @@
     "R": { "item": "minecraft:redstone" },
     "C": { "item": "computercraft:cable" }
   },
-  "result": { "id": "ccnix:network_tester", "count": 1 }
+  "result": { "id": "ccnix:network_configurator", "count": 1 }
 }

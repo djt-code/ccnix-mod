@@ -30,7 +30,7 @@ import net.minecraft.world.phys.BlockHitResult;
 
 /**
  * The gateway: a block with one network port, on the side that faced the player who placed it; a CC cable joins it
- * there and nowhere else. Right-click it with a Network Tester for its dialog.
+ * there and nowhere else. Right-click it with a Network Configurator for its dialog.
  */
 public final class GatewayBlock extends Block implements EntityBlock {
     public static final MapCodec<GatewayBlock> CODEC = simpleCodec(GatewayBlock::new);
@@ -107,13 +107,13 @@ public final class GatewayBlock extends Block implements EntityBlock {
     }
 
     /**
-     * A Network Tester opens its dialog; anything else in hand is used as usual (a cable placed against the block);
-     * an empty hand is told it takes a tester (or, with one in the off hand, opens it too).
+     * A Network Configurator opens its dialog; anything else in hand is used as usual (a cable placed against the block);
+     * an empty hand is told it takes a configurator (or, with one in the off hand, opens it too).
      */
     @Override
     protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos, Player player,
                                               InteractionHand hand, BlockHitResult hit) {
-        if (stack.is(Ccnix.NETWORK_TESTER.get())) {
+        if (stack.is(Ccnix.NETWORK_CONFIGURATOR.get())) {
             open(level, pos, player);
             return ItemInteractionResult.sidedSuccess(level.isClientSide);
         }
@@ -123,10 +123,10 @@ public final class GatewayBlock extends Block implements EntityBlock {
 
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
-        if (player.getOffhandItem().is(Ccnix.NETWORK_TESTER.get())) {
+        if (player.getOffhandItem().is(Ccnix.NETWORK_CONFIGURATOR.get())) {
             open(level, pos, player);
         } else if (player instanceof ServerPlayer p) {
-            p.displayClientMessage(Component.literal("Use a Network Tester on it for its status and VLANs"), true);
+            p.displayClientMessage(Component.literal("Use a Network Configurator on it for its status and VLANs"), true);
         }
         return InteractionResult.sidedSuccess(level.isClientSide);
     }

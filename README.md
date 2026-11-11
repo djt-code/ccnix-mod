@@ -101,7 +101,7 @@ was last heard on, a broadcast to all of them; `gateway.vlans` (all by default) 
   unloaded): a spare, not a loop. Its owner is told once, and its dialog says so.
 - **IDs and owners.** Each block gets an ID when placed, and remembers who placed it. A player may have
   `gateway.maxPerPlayer` (5) placed; `/ccnix gateways` lists them all.
-- **A Network Tester** opens a block's dialog: right-click the block holding one (in the main hand, or the off hand
+- **A Network Configurator** opens a block's dialog: right-click the block holding one (in the main hand, or the off hand
   with the main hand empty). Craft it from four iron ingots, a glass pane, redstone and a CC cable:
 
   ```

@@ -14,7 +14,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.List;
 
 /**
- * Server to client: a gateway block's dialog. Sent when a Network Tester opens it and after a change (refresh false:
+ * Server to client: a gateway block's dialog. Sent when a Network Configurator opens it and after a change (refresh false:
  * opened if it isn't), and each second it's open, answering {@link GatewayPoll} (refresh true: only an open dialog
  * takes it). Its title and where it is, its state (WORKING, STANDBY, DOWN) and what that means, rows of what it is and
  * has heard, its frame counts (in, out, from other blocks, filtered; none unless it's working), its VLANs and native
