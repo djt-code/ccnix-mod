@@ -14,9 +14,13 @@ import net.minecraft.network.chat.FormattedText;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.client.settings.IKeyConflictContext;
+import net.neoforged.neoforge.client.settings.KeyConflictContext;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * What the mod's dialogs share: a panel drawn as the game's containers are, rows of a label and a value (the label
@@ -100,6 +104,46 @@ abstract class Dialog extends Screen {
 
     boolean typing() {
         return getFocused() instanceof EditBox;
+    }
+
+    /**
+     * NeoForge gives the movement keys the in-game context, which counts them as let go while any screen is open,
+     * whatever they're set to. While a dialog is open they have this one instead: active with no screen, or with a
+     * dialog open and no box being typed in. Otherwise it's the in-game context's (the controls screen still sees
+     * them clash with the same keys).
+     */
+    private static final IKeyConflictContext WALKING = new IKeyConflictContext() {
+        @Override
+        public boolean isActive() {
+            var screen = Minecraft.getInstance().screen;
+            return screen == null || screen instanceof Dialog d && !d.typing();
+        }
+
+        @Override
+        public boolean conflicts(IKeyConflictContext other) {
+            return other == this || KeyConflictContext.IN_GAME.conflicts(other);
+        }
+    };
+
+    /** The movement keys' own contexts, while this has them walking; given back when it closes. */
+    private final Map<KeyMapping, IKeyConflictContext> kept = new HashMap<>();
+
+    @Override
+    public void added() {
+        super.added();
+        // (called before init, which is what sets minecraft)
+        for (var k : movementKeys(Minecraft.getInstance().options)) {
+            if (k.getKeyConflictContext() == WALKING) continue;
+            kept.put(k, k.getKeyConflictContext());
+            k.setKeyConflictContext(WALKING);
+        }
+    }
+
+    @Override
+    public void removed() {
+        kept.forEach(KeyMapping::setKeyConflictContext);
+        kept.clear();
+        super.removed();
     }
 
     /**
