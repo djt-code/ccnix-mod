@@ -283,15 +283,15 @@
           - { section: nat, key: forwards, value: "[{{ ccnix_nat_forwards | map('to_json') | join(', ') }}]" }
 
     # CC: Tweaked's own config: computers' screens, [term_sizes.computer] only
-    # (pocket computers and monitors have their own).
+    # (pocket computers and monitors have their own), and the disks' sizes.
     - name: Is there a CC config?
       ansible.builtin.stat:
         path: "{{ minecraft_dir }}/config/computercraft-server.toml"
       register: cc_config
 
-    - name: A CC config with the screen size, if there's none (CC fills in the rest)
+    - name: A CC config with the disks and the screen size, if there's none (CC fills in the rest)
       ansible.builtin.copy:
-        content: "[term_sizes]\n\t[term_sizes.computer]\n\t\twidth = {{ ccnix_cc_term_width }}\n\t\theight = {{ ccnix_cc_term_height }}\n"
+        content: "computer_space_limit = {{ ccnix_cc_computer_space }}\nfloppy_space_limit = {{ ccnix_cc_floppy_space }}\n\n[term_sizes]\n\t[term_sizes.computer]\n\t\twidth = {{ ccnix_cc_term_width }}\n\t\theight = {{ ccnix_cc_term_height }}\n"
         dest: "{{ minecraft_dir }}/config/computercraft-server.toml"
         owner: "{{ minecraft_user }}"
         mode: "0644"
@@ -310,6 +310,20 @@
         label: "{{ item.key }} {{ item.value }}"
       when: cc_config.stat.exists
       notify: Restart minecraft
+
+    # (top-level keys, before the first section; CC reloads them, so no restart)
+    - name: The disks' sizes
+      ansible.builtin.lineinfile:
+        path: "{{ minecraft_dir }}/config/computercraft-server.toml"
+        regexp: "^{{ item.key }}\\s*="
+        line: "{{ item.key }} = {{ item.value }}"
+        insertbefore: BOF
+      loop:
+        - { key: computer_space_limit, value: "{{ ccnix_cc_computer_space }}" }
+        - { key: floppy_space_limit, value: "{{ ccnix_cc_floppy_space }}" }
+      loop_control:
+        label: "{{ item.key }} {{ item.value }}"
+      when: cc_config.stat.exists
 
     # Writing eula=true means you accept the Minecraft EULA
     # (https://aka.ms/MinecraftEULA): read it first.  The play writes it
