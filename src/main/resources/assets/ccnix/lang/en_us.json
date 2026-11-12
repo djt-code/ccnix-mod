@@ -1,5 +1,6 @@
 {
   "block.ccnix.gateway": "Network Gateway",
   "item.ccnix.network_configurator": "Network Configurator",
-  "item.ccnix.network_configurator.tip": "Use on a Network Gateway for its status and VLANs, or on a cable for what's on its network"
+  "item.ccnix.network_configurator.tip": "Use on a Network Gateway for its status and VLANs, or on a cable for what's on its network",
+  "ccnix.escape.hint": "Esc went to the computer: Shift+Esc closes its screen"
 }

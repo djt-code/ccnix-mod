@@ -1,5 +1,6 @@
 package ccnix;
 
+import ccnix.client.EscapeKey;
 import ccnix.gateway.CableScreenData;
 import ccnix.gateway.GatewayBlock;
 import ccnix.gateway.GatewayBlockEntity;
@@ -24,6 +25,7 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.common.NeoForge;
@@ -88,5 +90,7 @@ public final class Ccnix {
         NeoForge.EVENT_BUS.addListener((ServerStartingEvent e) -> Service.start());
         NeoForge.EVENT_BUS.addListener((ServerStoppedEvent e) -> Service.stop());
         NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent e) -> CcnixCommand.register(e.getDispatcher()));
+        // (Esc on a computer's screen goes to the computer; only the client has screens)
+        if (FMLEnvironment.dist.isClient()) EscapeKey.register();
     }
 }
