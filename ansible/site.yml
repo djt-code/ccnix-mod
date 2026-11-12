@@ -311,7 +311,9 @@
       when: cc_config.stat.exists
       notify: Restart minecraft
 
-    # (top-level keys, before the first section; CC reloads them, so no restart)
+    # (top-level keys, before the first section.  CC reloads them, but a
+    # computer makes its disk once while it's loaded, and a reboot keeps it:
+    # so a restart)
     - name: The disks' sizes
       ansible.builtin.lineinfile:
         path: "{{ minecraft_dir }}/config/computercraft-server.toml"
@@ -324,6 +326,7 @@
       loop_control:
         label: "{{ item.key }} {{ item.value }}"
       when: cc_config.stat.exists
+      notify: Restart minecraft
 
     # Writing eula=true means you accept the Minecraft EULA
     # (https://aka.ms/MinecraftEULA): read it first.  The play writes it

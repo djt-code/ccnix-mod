@@ -108,9 +108,9 @@ and 24; CC's own default is 51x19) set `[term_sizes.computer]` in CC:
 Tweaked's `config/computercraft-server.toml`, whatever the bundle brought.
 Their disks: `ccnix_cc_computer_space` and `ccnix_cc_floppy_space` (8 MB
 and 2 MB, in bytes; CC's own defaults are 1 MB and 125 KB) set
-`computer_space_limit` and `floppy_space_limit` there. CC reloads them
-without a restart: a computer gets the new size at its next boot, a floppy
-when it's next put in a drive.
+`computer_space_limit` and `floppy_space_limit` there. A change restarts
+the server: CC reloads the file, but a computer makes its disk once while
+it's loaded, and `reboot` keeps that one.
 
 **NAT mode's settings** (`[nat]`), all the admin's:
 

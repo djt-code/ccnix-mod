@@ -86,9 +86,9 @@ ccnix_gateway_max_per_player: 5
 ccnix_cc_term_width: 80
 ccnix_cc_term_height: 24
 # Their disks, in bytes: a computer's or turtle's own, and a floppy's (CC's
-# own defaults are 1 MB and 125 KB; ccnix with a few apps fills 1 MB).  CC
-# reloads them while the server runs; a computer takes the new size when it
-# next boots, a floppy when it's next put in a drive.
+# own defaults are 1 MB and 125 KB; ccnix with a few apps fills 1 MB).  A
+# change restarts the server: a computer makes its disk once while it's
+# loaded, and `reboot` keeps it.
 ccnix_cc_computer_space: 8000000
 ccnix_cc_floppy_space: 2000000
 
