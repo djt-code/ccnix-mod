@@ -1,0 +1,42 @@
+# The checks every pull request and every push to main must pass (ADR-0009 in
+# ccnix): the mod built with the ROM from the ccnix/ submodule and its tests,
+# and the TUN helper compiled.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true          # ccnix/, which the ROM is built from (not recursive)
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: build and test
+        run: ./gradlew build
+      - name: the TUN helper
+        run: cc -O2 -Wall -Werror -o /tmp/ccnix-tun helper/ccnix-tun.c
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ccnix-jar
+          path: |
+            build/libs/ccnix-*.jar
+            !build/libs/ccnix-*-sources.jar
+          if-no-files-found: error
