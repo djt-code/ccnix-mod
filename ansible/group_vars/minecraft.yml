@@ -5,6 +5,12 @@ java_package: openjdk-21-jre-headless      # NeoForge 1.21.1 wants Java 21 exact
 minecraft_user: minecraft                  # runs the server, and the gateway's helper under it
 minecraft_home: /srv/minecraft
 minecraft_dir: /srv/minecraft/server
+# A disk of its own for the world (the saves: the I/O-heavy part), as a
+# stable path like /dev/disk/by-id/...; "" keeps the world on the root
+# disk.  Formatted (ext4) only if it has no filesystem, mounted at
+# minecraft_data_dir, and its world/ bound onto the server's world/.
+minecraft_world_disk: ""
+minecraft_data_dir: /srv/minecraft/disk
 minecraft_heap_min: 2G
 minecraft_heap_max: 5G                     # the VM has 7 GB
 # more JVM options.  preferIPv4Stack: the LAN advertises an IPv6 route that

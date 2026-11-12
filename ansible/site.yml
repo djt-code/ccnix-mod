@@ -110,6 +110,75 @@
         group: "{{ minecraft_user }}"
         mode: "0755"
 
+    # The world on its own disk (minecraft_world_disk).  A world already
+    # on the root disk isn't moved: the play stops at it (README.md says
+    # how to move it) rather than mount over it.
+    - name: The world's disk's filesystem
+      ansible.builtin.command: blkid -o value -s TYPE {{ minecraft_world_disk }}
+      register: world_fs
+      changed_when: false
+      failed_when: world_fs.rc not in [0, 2]     # 2: none yet
+      when: minecraft_world_disk != ""
+
+    - name: An ext4 filesystem on it, if it has none
+      ansible.builtin.command: mkfs.ext4 -q -L mcdata {{ minecraft_world_disk }}
+      when: minecraft_world_disk != "" and world_fs.stdout == ""
+
+    - name: Its UUID, and what's mounted already
+      ansible.builtin.command: "{{ item }}"
+      loop:
+        - blkid -o value -s UUID {{ minecraft_world_disk }}
+        - findmnt -n {{ minecraft_data_dir }}
+        - findmnt -n {{ minecraft_dir }}/world
+      register: world_state
+      changed_when: false
+      failed_when: false
+      when: minecraft_world_disk != ""
+
+    - name: What's in the server's world/, if that isn't mounted
+      ansible.builtin.find:
+        paths: "{{ minecraft_dir }}/world"
+        file_type: any
+      register: world_files
+      when: minecraft_world_disk != "" and world_state.results[2].rc != 0
+
+    - name: No world on the root disk to hide
+      ansible.builtin.fail:
+        msg: >-
+          {{ minecraft_dir }}/world holds a world on the root disk: stop the
+          server, move it onto the disk (ansible/README.md), and run the play again
+      when: minecraft_world_disk != "" and world_state.results[2].rc != 0 and world_files.matched > 0
+
+    - name: The disk and the world in fstab
+      ansible.builtin.lineinfile:
+        path: /etc/fstab
+        regexp: "^\\S+ {{ item.path }} "
+        line: "{{ item.src }} {{ item.path }} {{ item.type }} {{ item.opts }} 0 {{ item.pass }}"
+      loop:
+        - { src: "UUID={{ world_state.results[0].stdout }}", path: "{{ minecraft_data_dir }}", type: ext4, opts: "defaults,noatime", pass: 2 }
+        - { src: "{{ minecraft_data_dir }}/world", path: "{{ minecraft_dir }}/world", type: none, opts: bind, pass: 0 }
+      loop_control:
+        label: "{{ item.path }}"
+      when: minecraft_world_disk != ""
+
+    - name: The disk mounted
+      ansible.builtin.command: mount {{ minecraft_data_dir }}
+      when: minecraft_world_disk != "" and world_state.results[1].rc != 0
+
+    - name: Its world/, and the server's (the mount point)
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ minecraft_user }}"
+        group: "{{ minecraft_user }}"
+        mode: "0755"
+      loop: ["{{ minecraft_data_dir }}", "{{ minecraft_data_dir }}/world", "{{ minecraft_dir }}/world"]
+      when: minecraft_world_disk != ""
+
+    - name: The world mounted
+      ansible.builtin.command: mount {{ minecraft_dir }}/world
+      when: minecraft_world_disk != "" and world_state.results[2].rc != 0
+
     - name: NeoForge installer
       ansible.builtin.get_url:
         url: "https://maven.neoforged.net/releases/net/neoforged/neoforge/{{ neoforge_version }}/neoforge-{{ neoforge_version }}-installer.jar"

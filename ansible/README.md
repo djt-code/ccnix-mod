@@ -70,6 +70,15 @@ ansible/run-on-host.sh devserver server-bundle.tar.gz --check --diff
 - **`minecraft.service`** runs `run.sh nogui` in a tmux session, and stops
   it with `stop` at the console. `mc-console` attaches to it (Ctrl+B D
   leaves); `mc-cmd "op <you>"` types a command.
+- **The world on its own disk**, with `minecraft_world_disk` set (a stable
+  path, `/dev/disk/by-id/...`): an ext4 filesystem if it has none, mounted
+  at `minecraft_data_dir` (`/srv/minecraft/disk`), and its `world/` bound
+  onto the server's (Minecraft refuses a symlinked world). The unit
+  requires that mount, so the server never starts a new world on the
+  empty folder. The play won't mount over a world already on the root
+  disk; to move one, with the server stopped, mount the disk, `rsync
+  -aHAX` the world into `world/` on it, rename the old one (say to
+  `world.old-rootdisk`), and run the play again.
 - **A new bundle** stops the server, replaces `mods/` and unpacks the
   pack's `config/` and `defaultconfigs/` over the old, then starts it.
   `config/ccnix-server.toml`'s keys are set from the variables every run

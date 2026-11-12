@@ -10,6 +10,10 @@ Wants=network-online.target ccnix-tun.service
 After=network-online.target
 Wants=network-online.target
 {% endif %}
+{% if minecraft_world_disk %}
+# the world is on its own disk (minecraft_world_disk): never start on the empty folder
+RequiresMountsFor={{ minecraft_dir }}/world
+{% endif %}
 
 [Service]
 Type=forking
