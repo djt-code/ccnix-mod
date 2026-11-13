@@ -2,7 +2,9 @@
 # ccnix): the mod built with the ROM from the ccnix/ submodule and its tests,
 # and the TUN helper compiled. After a green run on main, the release job
 # makes release vX.Y.Z for mod_version, with the jar, if there isn't one yet
-# (D5, D6).
+# (D5, D6), and uploads the jar to Modrinth and CurseForge (D7): each only once
+# its token is set (MODRINTH_TOKEN, CURSEFORGE_TOKEN; the projects' IDs are the
+# variables MODRINTH_ID and CURSEFORGE_ID).
 name: CI
 
 on:
@@ -10,6 +12,10 @@ on:
   push:
     branches: [main]
   workflow_dispatch:              # (to retry a release: runs on main's tip)
+    inputs:
+      publish:
+        description: "Upload main's version again to: none, modrinth, curseforge or both (when a site failed)"
+        default: none
 
 permissions:
   contents: read
@@ -66,6 +72,9 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       VERSION: ${{ needs.build.outputs.version }}
       ROM: ${{ needs.build.outputs.rom }}
+      MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+      CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+      PUBLISH: ${{ inputs.publish }}
     steps:
       - name: out already?
         id: out
@@ -75,7 +84,7 @@ jobs:
             echo "out=true" >> "$GITHUB_OUTPUT"
           fi
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        if: steps.out.outputs.out != 'true'
+        if: steps.out.outputs.out != 'true' || (env.PUBLISH != '' && env.PUBLISH != 'none')
         with:
           name: ccnix-jar
           path: jar
@@ -86,6 +95,36 @@ jobs:
             --target "$GITHUB_SHA" --title "ccnix-mod v$VERSION" \
             --notes "The ROM: ccnix v$ROM. For Minecraft 1.21.1, NeoForge, with CC: Tweaked 1.120 or later." \
             --generate-notes
+      # One step a site, so a site that failed can be tried again alone (the
+      # publish input): Modrinth refuses a version number it already has.
+      - name: Modrinth
+        if: env.MODRINTH_TOKEN != '' && (steps.out.outputs.out != 'true' || env.PUBLISH == 'modrinth' || env.PUBLISH == 'both')
+        uses: Kir-Antipov/mc-publish@c23376546a97f5ba7984e94445da359459b14419 # v3.3.2
+        with:
+          modrinth-id: ${{ vars.MODRINTH_ID }}
+          modrinth-token: ${{ env.MODRINTH_TOKEN }}
+          files: jar/ccnix-${{ env.VERSION }}.jar
+          name: ccnix ${{ env.VERSION }}
+          version: ${{ env.VERSION }}
+          version-type: beta        # while it's 0.x
+          changelog: "The ROM: ccnix v${{ env.ROM }}. What changed: https://github.com/${{ github.repository }}/releases/tag/v${{ env.VERSION }}"
+          loaders: neoforge
+          game-versions: "1.21.1"
+          java: "21"
+      - name: CurseForge
+        if: env.CURSEFORGE_TOKEN != '' && (steps.out.outputs.out != 'true' || env.PUBLISH == 'curseforge' || env.PUBLISH == 'both')
+        uses: Kir-Antipov/mc-publish@c23376546a97f5ba7984e94445da359459b14419 # v3.3.2
+        with:
+          curseforge-id: ${{ vars.CURSEFORGE_ID }}
+          curseforge-token: ${{ env.CURSEFORGE_TOKEN }}
+          files: jar/ccnix-${{ env.VERSION }}.jar
+          name: ccnix ${{ env.VERSION }}
+          version: ${{ env.VERSION }}
+          version-type: beta        # while it's 0.x
+          changelog: "The ROM: ccnix v${{ env.ROM }}. CC: Tweaked 1.120 or later comes from Modrinth, not CurseForge. What changed: https://github.com/${{ github.repository }}/releases/tag/v${{ env.VERSION }}"
+          loaders: neoforge
+          game-versions: "1.21.1"
+          java: "21"              # (mc-publish's issue #145: also set by hand on the project)
 
   # ccnix's ADR-0009 D4, step 2: the mod's release brings ccnix's mod/ along.
   # ccnix's branch bump/mod is rebuilt from its main with mod/ at the release's
