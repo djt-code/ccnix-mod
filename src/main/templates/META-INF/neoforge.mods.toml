@@ -32,3 +32,20 @@ ccnix, a small Unix-like distribution for CC: Tweaked, in every computer's ROM, 
     versionRange="[1.120,)"
     ordering="AFTER"
     side="BOTH"
+    # the projects mc-publish links on the sites (the modId alone would name
+    # dan200's ComputerCraft of 2017 on both)
+    [dependencies.${mod_id}.mc-publish]
+        modrinth="cc-tweaked"
+        curseforge="cc-tweaked"
+
+# Used by ccnix's Lua (lib/mc: the chat box, player and environment detectors)
+# when it's there; nothing in the mod needs it, so any version will do.
+[[dependencies.${mod_id}]]
+    modId="advancedperipherals"
+    type="optional"
+    versionRange="[0,)"
+    ordering="NONE"
+    side="BOTH"
+    [dependencies.${mod_id}.mc-publish]
+        modrinth="advancedperipherals"
+        curseforge="advanced-peripherals"
