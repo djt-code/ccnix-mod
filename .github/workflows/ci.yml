@@ -86,3 +86,55 @@ jobs:
             --target "$GITHUB_SHA" --title "ccnix-mod v$VERSION" \
             --notes "The ROM: ccnix v$ROM. For Minecraft 1.21.1, NeoForge, with CC: Tweaked 1.120 or later." \
             --generate-notes
+
+  # ccnix's ADR-0009 D4, step 2: the mod's release brings ccnix's mod/ along.
+  # ccnix's branch bump/mod is rebuilt from its main with mod/ at the release's
+  # tag, and its pull request merges itself on green. It moves mod/ alone, so
+  # ccnix makes no release from it, and the round ends. Everything is done with
+  # LOCKSTEP_TOKEN: what GITHUB_TOKEN does starts no workflows.
+  lockstep:
+    name: lockstep
+    needs: [build, release]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: lockstep
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ secrets.LOCKSTEP_TOKEN }}
+      CCNIX: djt-code/ccnix
+      BRANCH: bump/mod
+      VERSION: ${{ needs.build.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0          # the history, to compare ccnix's mod/ with the release
+      - name: ccnix's mod/ follows the release
+        run: |
+          if [ -z "$GH_TOKEN" ]; then echo "no LOCKSTEP_TOKEN: skipped"; exit 0; fi
+          tag=$(gh api "repos/$GITHUB_REPOSITORY/commits/v$VERSION" --jq .sha)
+          ptr=$(gh api "repos/$CCNIX/contents/mod?ref=main" --jq .sha)
+          open=$(gh pr list -R "$CCNIX" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          finish() {
+            echo "$1"
+            if [ -n "$open" ]; then gh pr close "$open" -R "$CCNIX" --delete-branch --comment "$1"; fi
+            exit 0
+          }
+          git cat-file -e "$ptr^{commit}" || { echo "ccnix's mod/ ($ptr) isn't in ccnix-mod's history"; exit 1; }
+          if git merge-base --is-ancestor "$tag" "$ptr"; then finish "ccnix's mod/ already carries ccnix-mod v$VERSION."; fi
+          git clone -q --depth 1 "https://x-access-token:$GH_TOKEN@github.com/$CCNIX.git" "$RUNNER_TEMP/ccnix"
+          cd "$RUNNER_TEMP/ccnix"
+          git switch -q -c "$BRANCH"
+          git update-index --cacheinfo "160000,$tag,mod"
+          git -c user.name="ccnix lockstep" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "mod/: at ccnix-mod v$VERSION" -m "Made by ccnix-mod's lockstep job (ADR-0009 D4) for ccnix-mod v$VERSION."
+          git push -q --force origin "$BRANCH"
+          title="mod/: at ccnix-mod v$VERSION"
+          body="ccnix-mod v$VERSION is out, so \`mod/\` moves to the release ($tag) (ADR-0009 D4). It changes \`mod/\` alone, so no ccnix release follows. Made by ccnix-mod's lockstep job; it merges itself once \`sims\` is green."
+          if [ -n "$open" ]; then
+            gh pr edit "$open" -R "$CCNIX" --title "$title" --body "$body"
+            n=$open
+          else
+            n=$(gh pr create -R "$CCNIX" --base main --head "$BRANCH" --title "$title" --body "$body" --label lockstep | sed 's#.*/##')
+          fi
+          gh pr merge "$n" -R "$CCNIX" --auto --merge || gh pr merge "$n" -R "$CCNIX" --merge
