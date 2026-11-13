@@ -1,20 +1,25 @@
 # The project page on Modrinth and CurseForge
 
 The text for ccnix's pages on both sites, kept here so it changes with the
-mod. Paste the summary and the description; set the rest by hand (see
-"Settings" at the end). Both sites take Markdown.
+mod. Paste the summary and the description as they stand; set the rest by
+hand (see "Settings" at the end). Both sites take Markdown. The summary is
+one sentence that doesn't repeat the title (the sites' rule), under about
+250 characters.
+
+The point to get across: ComputerCraft's modems only pass messages between
+computers. ccnix runs a real network stack over them (IPv4, ICMP, TCP, UDP,
+DNS), and the mod's gateway joins those networks to real ones and the
+internet.
 
 ## Summary
 
-(One sentence; it must not repeat the title.)
-
-> A Unix-like system in every CC: Tweaked computer's ROM, and a gateway block that puts ComputerCraft's network on a real one.
+> A Unix-like system for CC: Tweaked computers, with its own TCP/IP stack and a gateway block that routes in-game networks onto real ones and the internet.
 
 ## Description
 
 > **Needs CC: Tweaked 1.120 or later.** CC: Tweaked is no longer published on CurseForge (its last file there is 1.113.1, too old for this mod). Get it from [Modrinth](https://modrinth.com/mod/cc-tweaked) or [CC: Tweaked's site](https://tweaked.cc/).
 
-ccnix turns every CC: Tweaked computer and turtle into a small Unix-like system, with nothing to install, and lets those computers talk to real networks.
+ccnix turns every CC: Tweaked computer and turtle into a small Unix-like system, with nothing to install. ComputerCraft's modems on their own only pass messages between computers; ccnix runs a real network stack over them (IPv4, ICMP, TCP, UDP and DNS), and the mod's gateway block joins those networks to real ones and to the internet.
 
 ### In every computer's ROM
 
