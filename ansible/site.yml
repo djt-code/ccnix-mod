@@ -12,6 +12,7 @@
   become: true
   vars:
     neoforge_args: "{{ minecraft_dir }}/libraries/net/neoforged/neoforge/{{ neoforge_version }}/unix_args.txt"
+    upgrade_at: "*-*-* {{ [host_upgrade_time, host_upgrade_timezone] | select | join(' ') }}"
 
   tasks:
     - name: Packages
@@ -396,6 +397,46 @@
       register: ufw
       changed_when: "'Skipping' not in ufw.stdout"
 
+    # Upgrades: the daily one at an hour nobody plays, and needrestart
+    # leaving the server alone (an upgrade of glibc restarted it mid-game)
+    - name: The upgrade's time is one systemd reads
+      ansible.builtin.command: systemd-analyze calendar "{{ upgrade_at }}"
+      changed_when: false
+      check_mode: false
+
+    - name: The timer's drop-in folder
+      ansible.builtin.file:
+        path: /etc/systemd/system/apt-daily-upgrade.timer.d
+        state: directory
+        mode: "0755"
+
+    - name: The daily upgrade's time
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/apt-daily-upgrade.timer.d/ccnix.conf
+        mode: "0644"
+        content: |
+          # written by the ccnix playbook (ansible/site.yml: host_upgrade_*)
+          [Timer]
+          OnCalendar=
+          OnCalendar={{ upgrade_at }}
+          RandomizedDelaySec={{ host_upgrade_delay }}
+      notify: Restart the upgrade's timer
+
+    - name: needrestart never restarts the server (minecraft_needrestart false)
+      ansible.builtin.copy:
+        dest: /etc/needrestart/conf.d/ccnix-minecraft.conf
+        mode: "0644"
+        content: |
+          # written by the ccnix playbook (ansible/site.yml: minecraft_needrestart false)
+          $nrconf{override_rc}{qr(^minecraft\.service$)} = 0;
+      when: not minecraft_needrestart | bool
+
+    - name: needrestart restarts it as it would (minecraft_needrestart true)
+      ansible.builtin.file:
+        path: /etc/needrestart/conf.d/ccnix-minecraft.conf
+        state: absent
+      when: minecraft_needrestart | bool
+
     # (a restart the changes above asked for happens here, so the server
     # isn't started below and then restarted again at the end)
     - name: Restart what changed
@@ -419,5 +460,11 @@
     - name: Restart minecraft
       ansible.builtin.systemd_service:
         name: minecraft
+        state: restarted
+        daemon_reload: true
+
+    - name: Restart the upgrade's timer
+      ansible.builtin.systemd_service:
+        name: apt-daily-upgrade.timer
         state: restarted
         daemon_reload: true

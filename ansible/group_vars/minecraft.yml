@@ -18,6 +18,20 @@ minecraft_heap_max: 5G                     # the VM has 7 GB
 # every login failed with "Authentication servers are down".
 minecraft_jvm_options: ["-Djava.net.preferIPv4Stack=true"]
 minecraft_ports: ["25565/tcp", "24454/udp"]   # the game; Simple Voice Chat
+# Ubuntu's daily unattended upgrade (apt-daily-upgrade.timer): at
+# host_upgrade_time (HH:MM) in host_upgrade_timezone ("" for the host's own
+# zone; an IANA name like "Europe/Berlin" keeps it at that hour through
+# daylight saving), starting up to host_upgrade_delay later.  Ubuntu's own
+# is 06:00 and 60m.  Pick an hour nobody plays.
+host_upgrade_time: "06:00"
+host_upgrade_timezone: ""
+host_upgrade_delay: 60m
+# needrestart restarts the services still using a library an upgrade
+# replaced (glibc, Java).  false: never the Minecraft server, which takes
+# the new library at its next restart (`sudo needrestart -r l` lists what's
+# waiting); true: needrestart's own way, the server restarts and kicks
+# everyone.
+minecraft_needrestart: false
 # true writes eula=true into eula.txt, which means you accept the Minecraft
 # EULA (https://aka.ms/MinecraftEULA): read it first.  Set it in your
 # host_vars or with -e minecraft_eula_accepted=true; false leaves eula.txt
