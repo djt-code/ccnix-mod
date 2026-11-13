@@ -1,5 +1,7 @@
 # ccnix
 
+<img src="src/main/resources/ccnix.png" alt="The ccnix icon: a gold computer with #! on its screen" width="96" align="right">
+
 A Minecraft mod (NeoForge 1.21.1, with CC: Tweaked) with two parts:
 
 - **The ROM.** [ccnix](https://github.com/djt-code/ccnix)'s programs go into every computer's ROM: the
