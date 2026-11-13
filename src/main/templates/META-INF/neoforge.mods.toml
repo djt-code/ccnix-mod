@@ -17,6 +17,10 @@ description='''
 ccnix, a small Unix-like distribution for CC: Tweaked, in every computer's ROM, updated with git; and a block that joins ComputerCraft's wired network to a real one, so computers running ccnix's network stack reach real IPv4 hosts. In NAT mode (the default, and singleplayer's) the server's own address stands in for them on the connections they open, with nothing to set up. In TUN mode a TUN device on a Linux server routes them, and real hosts reach them too.
 '''
 
+# a fix to CC: Tweaked's paste packet (ccnix.mixin.PasteLimitMixin)
+[[mixins]]
+config="${mod_id}.mixins.json"
+
 [[dependencies.${mod_id}]]
     modId="neoforge"
     type="required"
