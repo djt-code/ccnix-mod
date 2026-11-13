@@ -79,6 +79,16 @@ ansible/run-on-host.sh devserver server-bundle.tar.gz --check --diff
   disk; to move one, with the server stopped, mount the disk, `rsync
   -aHAX` the world into `world/` on it, rename the old one (say to
   `world.old-rootdisk`), and run the play again.
+- **Upgrades that don't kick the players.** Ubuntu's daily unattended
+  upgrade runs at `host_upgrade_time` in `host_upgrade_timezone` (`"06:00"`
+  in the host's own zone, Ubuntu's own; an IANA zone like
+  `"America/New_York"` keeps it at that hour through daylight saving),
+  starting up to `host_upgrade_delay` (`60m`) later: a drop-in for
+  `apt-daily-upgrade.timer`. Pick an hour nobody plays. And with
+  `minecraft_needrestart` false (the default), needrestart never restarts
+  the server after an upgrade (a glibc one did, mid-game): it takes the new
+  libraries at its next restart, and `sudo needrestart -r l` lists what's
+  waiting. True leaves needrestart to restart it.
 - **A new bundle** stops the server, replaces `mods/` and unpacks the
   pack's `config/` and `defaultconfigs/` over the old, then starts it.
   `config/ccnix-server.toml`'s keys are set from the variables every run
