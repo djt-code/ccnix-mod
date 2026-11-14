@@ -17,6 +17,10 @@ repositories {
         url = 'https://maven.squiddev.cc'
         content { includeGroup('cc.tweaked') }
     }
+    maven {
+        url = 'https://maven.blamejared.com'
+        content { includeGroup('mezz.jei'); includeGroup('net.mezzdev.config') }
+    }
 }
 
 neoForge {
@@ -52,6 +56,9 @@ tasks.matching { it.name == 'runServer' }.configureEach {
 dependencies {
     compileOnly "cc.tweaked:cc-tweaked-${minecraft_version}-forge-api:${cct_version}"
     runtimeOnly "cc.tweaked:cc-tweaked-${minecraft_version}-forge:${cct_version}"
+    // JEI, only if it's installed: ccnix.jei's plugin is found by JEI, so without JEI nothing loads it
+    compileOnly "mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}"
+    runtimeOnly "mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}"
 
     // The tests run ccnix's lib/net.lua in Cobalt, CC's Lua VM.
     testImplementation "cc.tweaked:cobalt:${cobalt_version}"

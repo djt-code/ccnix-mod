@@ -231,7 +231,9 @@ it, end to end.
    ```
 
 3. **Install the mod.** Build it with `./gradlew build`, then put `build/libs/ccnix-<version>.jar` in the server's
-   `mods/`. Clients need it too, for the block. It needs CC: Tweaked 1.120 or later.
+   `mods/`. Clients need it too, for the block. A client with it still joins a server without it, where it stands
+   aside (its items aren't in the creative tabs, and Esc closes a computer's screen). It needs CC: Tweaked 1.120 or
+   later.
 
 4. **Configure it** in `config/ccnix-server.toml` in the server's folder (NeoForge 21.1 keeps server configs there).
    Edits take effect while the server runs.
@@ -255,7 +257,8 @@ it, end to end.
 
 5. **Place a Network Gateway** and cable it to CC routers' wired modems. Its one network port faces you as you place it,
    and a cable joins it only there. It's crafted from a full wired modem, gold, stone and an eye of ender (stone, gold,
-   stone / gold, modem, gold / stone, eye, stone), and found in the Functional Blocks tab. `/ccnix` (operators) shows the gateway too:
+   stone / gold, modem, gold / stone, eye, stone), and found in ComputerCraft's creative tab, after the wired modems (the Network Configurator is beside it). With JEI
+   installed, both have an Information page there. `/ccnix` (operators) shows the gateway too:
    - its mode, address, routes and blocks;
    - the neighbours it knows;
    - packets carried and dropped;
