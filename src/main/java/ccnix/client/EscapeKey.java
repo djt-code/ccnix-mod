@@ -16,7 +16,8 @@ import java.lang.reflect.Method;
  * Esc on a computer's screen goes to the computer, as CC's keys.escape (vi leaves insert mode with it, readline takes
  * it as Alt), instead of closing the screen; Shift+Esc closes it, as Esc alone did. The key goes to the server as CC
  * sends every other key, so only the client needs this. CC's screen classes aren't in its API jar: the screen's input
- * is found by name, and if CC ever renames it, Esc just closes the screen again.
+ * is found by name, and if CC ever renames it, Esc just closes the screen again. On a server without ccnix, Esc closes
+ * the screen, as there.
  */
 public final class EscapeKey {
     private static final Logger LOG = LogUtils.getLogger();
@@ -36,7 +37,7 @@ public final class EscapeKey {
     }
 
     private static void pressed(ScreenEvent.KeyPressed.Pre e) {
-        if (e.getKeyCode() != GLFW.GLFW_KEY_ESCAPE || Screen.hasShiftDown()) return;
+        if (e.getKeyCode() != GLFW.GLFW_KEY_ESCAPE || Screen.hasShiftDown() || !Remote.hasCcnix()) return;
         var in = inputOf(e.getScreen());
         if (in == null) return;
         try {

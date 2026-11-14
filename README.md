@@ -231,7 +231,9 @@ it, end to end.
    ```
 
 3. **Install the mod.** Build it with `./gradlew build`, then put `build/libs/ccnix-<version>.jar` in the server's
-   `mods/`. Clients need it too, for the block. It needs CC: Tweaked 1.120 or later.
+   `mods/`. Clients need it too, for the block. A client with it still joins a server without it, where it stands
+   aside (its items aren't in the creative tabs, and Esc closes a computer's screen). It needs CC: Tweaked 1.120 or
+   later.
 
 4. **Configure it** in `config/ccnix-server.toml` in the server's folder (NeoForge 21.1 keeps server configs there).
    Edits take effect while the server runs.

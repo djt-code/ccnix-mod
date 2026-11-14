@@ -1,6 +1,7 @@
 package ccnix;
 
 import ccnix.client.EscapeKey;
+import ccnix.client.Remote;
 import ccnix.gateway.CableScreenData;
 import ccnix.gateway.GatewayBlock;
 import ccnix.gateway.GatewayBlockEntity;
@@ -73,12 +74,16 @@ public final class Ccnix {
         bus.addListener((RegisterCapabilitiesEvent e) ->
             e.registerBlockEntity(WiredElementCapability.get(), GATEWAY_ENTITY.get(), (be, side) -> be.element(side)));
         bus.addListener((BuildCreativeModeTabContentsEvent e) -> {
+            // (a server without ccnix has no block or items to give)
+            if (FMLEnvironment.dist.isClient() && !Remote.hasCcnix()) return;
             if (e.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) e.accept(GATEWAY_ITEM);
             if (e.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) e.accept(NETWORK_CONFIGURATOR);
         });
         bus.addListener(RomPack::addTo);
-        // (the version: a client and server whose payloads differ are refused, not left to misread them)
-        bus.addListener((RegisterPayloadHandlersEvent e) -> e.registrar("4")
+        // (the version: a client and server whose payloads differ are refused, not left to misread them. Optional: a
+        // client with ccnix still joins a server without it, where ccnix.client.Remote stands it aside; a client
+        // without ccnix is still refused by a server with it, whose block it lacks)
+        bus.addListener((RegisterPayloadHandlersEvent e) -> e.registrar("4").optional()
             .playToClient(GatewayScreenData.TYPE, GatewayScreenData.STREAM_CODEC, GatewayScreenData::handle)
             .playToClient(CableScreenData.TYPE, CableScreenData.STREAM_CODEC, CableScreenData::handle)
             .playToServer(GatewayFilter.TYPE, GatewayFilter.STREAM_CODEC, GatewayFilter::handle)
