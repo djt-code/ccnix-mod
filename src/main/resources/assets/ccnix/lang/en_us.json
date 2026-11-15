@@ -2,5 +2,7 @@
   "block.ccnix.gateway": "Network Gateway",
   "item.ccnix.network_configurator": "Network Configurator",
   "item.ccnix.network_configurator.tip": "Use on a Network Gateway for its status and VLANs, or on a cable for what's on its network",
-  "ccnix.escape.hint": "Esc went to the computer: Shift+Esc closes its screen"
+  "ccnix.escape.hint": "Esc went to the computer: Shift+Esc closes its screen",
+  "ccnix.jei.gateway": "Joins ComputerCraft's wired network to a real one, as the server's admin set it up: CC computers reach the internet through it, and the outside reaches them through port forwards (NAT mode) or routing (TUN mode).\n\nIts one network port faces you as you place it, and a cable joins it only there: cable it to the wired modems of CC routers. A Network Configurator shows its status and VLANs; operators also have /ccnix.",
+  "ccnix.jei.network_configurator": "Use it on a Network Gateway for the gateway's status and the VLANs it carries, which its owner or an op can change there.\n\nUse it on a CC cable or wired modem for what's on that cable network."
 }
