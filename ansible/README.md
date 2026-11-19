@@ -88,7 +88,11 @@ ansible/run-on-host.sh devserver server-bundle.tar.gz --check --diff
   `minecraft_needrestart` false (the default), needrestart never restarts
   the server after an upgrade (a glibc one did, mid-game): it takes the new
   libraries at its next restart, and `sudo needrestart -r l` lists what's
-  waiting. True leaves needrestart to restart it.
+  waiting. True leaves needrestart to restart it. With `java_auto_upgrade`
+  false (the default), the daily upgrade leaves Java alone: a JDK upgraded
+  under the running server stops it starting any program (git for `/ccnix
+  rom update`, the TUN helper) until it restarts. Upgrade Java by hand when
+  you restart the server.
 - **A new bundle** stops the server, replaces `mods/` and unpacks the
   pack's `config/` and `defaultconfigs/` over the old, then starts it.
   `config/ccnix-server.toml`'s keys are set from the variables every run

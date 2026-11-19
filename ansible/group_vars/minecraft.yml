@@ -32,6 +32,13 @@ host_upgrade_delay: 60m
 # waiting); true: needrestart's own way, the server restarts and kicks
 # everyone.
 minecraft_needrestart: false
+# Java (java_package) left out of the daily upgrade: one upgraded under the
+# running server leaves it unable to start any program (git for `/ccnix rom
+# update`, the TUN helper) until it restarts, since Java starts them through
+# a helper from the JDK on disk, which then refuses the old JVM.  Upgrade it
+# by hand when you restart the server (`sudo apt install --only-upgrade
+# openjdk-21-jre-headless`).  true lets the daily upgrade take it.
+java_auto_upgrade: false
 # true writes eula=true into eula.txt, which means you accept the Minecraft
 # EULA (https://aka.ms/MinecraftEULA): read it first.  Set it in your
 # host_vars or with -e minecraft_eula_accepted=true; false leaves eula.txt
