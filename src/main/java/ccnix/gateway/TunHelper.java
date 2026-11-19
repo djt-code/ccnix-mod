@@ -99,7 +99,8 @@ final class TunHelper {
             try {
                 p = new ProcessBuilder(command).start();
             } catch (IOException e) {
-                state = "can't start " + name + ": " + e.getMessage();
+                var jdk = ccnix.Spawn.jdkReplaced(e);
+                state = "can't start " + name + ": " + (jdk != null ? jdk : e.getMessage());
                 if (!Objects.equals(lastProblem, e.getMessage())) LOG.warn("ccnix: {}", state);
                 lastProblem = e.getMessage();
             }

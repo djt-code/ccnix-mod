@@ -397,7 +397,8 @@ final class CcnixCommand {
             var lines = out.split("\n");
             return new Git(false, out.isEmpty() ? "git exited with " + p.exitValue() : lines[lines.length - 1].trim());
         } catch (IOException e) {
-            return new Git(false, "can't run git (is it installed?): " + e.getMessage());
+            var jdk = Spawn.jdkReplaced(e);
+            return new Git(false, jdk != null ? jdk : "can't run git (is it installed?): " + e.getMessage());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return new Git(false, "interrupted");
