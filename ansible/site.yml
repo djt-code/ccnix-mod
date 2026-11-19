@@ -437,6 +437,23 @@
         state: absent
       when: minecraft_needrestart | bool
 
+    - name: The daily upgrade leaves Java alone (java_auto_upgrade false)
+      ansible.builtin.copy:
+        dest: /etc/apt/apt.conf.d/51ccnix-java
+        mode: "0644"
+        content: |
+          // written by the ccnix playbook (ansible/site.yml: java_auto_upgrade false)
+          Unattended-Upgrade::Package-Blacklist {
+              "^{{ java_package }}$";
+          };
+      when: not java_auto_upgrade | bool
+
+    - name: The daily upgrade takes Java too (java_auto_upgrade true)
+      ansible.builtin.file:
+        path: /etc/apt/apt.conf.d/51ccnix-java
+        state: absent
+      when: java_auto_upgrade | bool
+
     # (a restart the changes above asked for happens here, so the server
     # isn't started below and then restarted again at the end)
     - name: Restart what changed
